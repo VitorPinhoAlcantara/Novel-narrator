@@ -1,0 +1,102 @@
+[paths]
+data_dir = "data"
+voices_dir = "voices"
+model_dir = "models/xtts_narrator"
+tts_python = ""
+
+[outputs]
+audiobook = true
+cbz = true
+pdf = false
+
+[pdf]
+remove_site_link = true
+remove_translation_mark = true
+
+[cbz]
+jpg_quality = 95
+dpi = 150
+
+[download]
+delay_s = 3
+max_retries = 3
+parallel = 3
+lookahead_chapters = 6
+
+[text]
+segment_ending = "semicolon_newline"
+
+[text.pauses_ms]
+sentence = 250
+paragraph = 700
+
+[text.normalization]
+pronoun_hyphen = "keep"
+compound_hyphen = "keep"
+dash = "keep"
+ellipsis = "comma"
+brackets = "keep"
+numbers = "words"
+inner_period = "normal"
+abbreviations = "expand"
+interjections = "keep"
+
+[tts]
+voice = "voz_shadow_slave_ref.wav"
+language = "pt"
+device = "cuda"
+matmul = "highest"
+workers = 3
+adaptive_workers = true
+gpu_util_low = 35
+gpu_util_moderate = 70
+vram_per_worker_mb = 3500
+vram_reserve_mb = 2000
+vram_critical_mb = 1000
+vram_headroom_mb = 2500
+qa_attempts = 3
+trim_final_burst = true
+
+[tts.xtts]
+temperature = 0.55
+repetition_penalty = 2.0
+top_k = 30
+top_p = 0.7
+speed = 1.1
+
+[tts.reference]
+gpt_cond_len = 30
+gpt_cond_chunk_len = 6
+max_ref_length = 30
+
+[tts.emotion]
+enabled = true
+
+[tts.asr]
+enabled = true
+model = "openai/whisper-small"
+rounds = 2
+
+[tts.qa]
+
+[tts.asr.limits]
+
+[tts.asr.retry_params."2"]
+temperature = 0.7
+top_p = 0.85
+
+[audiobook]
+format = "m4b"
+bitrate = "96k"
+language = "por"
+batch_chapters = 10
+volume_title = "{novel} Volume {volume}"
+default_author = "Central Novel"
+
+[abs]
+url = ""
+library = ""
+local_dir = ""
+ssh = ""
+remote_dir = ""
+token = ""

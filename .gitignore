@@ -3,6 +3,10 @@
 !LICENSE*
 
 .env
+config.toml
+data/
+models/
+voices/
 .venv/
 __pycache__/
 *.py[cod]
