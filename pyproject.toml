@@ -1,0 +1,68 @@
+[project]
+name = "novel-narrator"
+version = "0.1.0"
+description = "Download web novels and turn them into audiobooks with a fine-tuned XTTS voice"
+readme = "README.md"
+requires-python = "==3.12.*"
+dependencies = [
+    "beautifulsoup4>=4.15",
+    "inquirerpy>=0.3.4",
+    "lxml>=6.1",
+    "num2words>=0.5.14",
+    "numpy>=2.5",
+    "pillow>=12.3",
+    "pymupdf>=1.28",
+    "requests>=2.33",
+    "soundfile>=0.14",
+]
+
+[project.optional-dependencies]
+tts = [
+    "coqui-tts==0.27.5",
+    "librosa==1.0.0",
+    "scipy==1.18.1",
+    "tokenizers==0.22.2",
+    "torch==2.13.0",
+    "torchaudio==2.11.0",
+    "torchcodec==0.16.0",
+    "transformers==5.8.0",
+]
+finetune = [
+    "novel-narrator[tts]",
+    "coqui-tts-trainer==0.3.3",
+    "pandas==3.0.6",
+    "tensorboard==2.21.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.9",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+environments = ["sys_platform == 'win32'", "sys_platform == 'linux'"]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu130" }
+torchaudio = { index = "pytorch-cu130" }
+torchcodec = { index = "pytorch-cu130" }
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
