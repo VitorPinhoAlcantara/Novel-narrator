@@ -19,6 +19,7 @@ dependencies = [
 
 [project.scripts]
 novel-narrator = "novel_narrator.cli.__main__:main"
+novel-narrator-web = "novel_narrator.web.__main__:main"
 
 [project.optional-dependencies]
 tts = [
@@ -37,9 +38,16 @@ finetune = [
     "pandas==3.0.6",
     "tensorboard==2.21.0",
 ]
+web = [
+    "fastapi>=0.115",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+    "uvicorn>=0.32",
+]
 
 [dependency-groups]
 dev = [
+    "httpx2>=2.16.0",
     "pytest>=8",
     "ruff>=0.9",
 ]

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Trabalho {{ job.id }} · Novel Narrator{% endblock %}
+{% block content %}
+<hgroup>
+  <h1>{{ job.title }}</h1>
+  <p>Trabalho #{{ job.id }} · {{ describe_outputs(job.outputs) }} · {{ job.total }} capítulo(s)</p>
+</hgroup>
+{% include "_job_status.html" %}
+{% endblock %}

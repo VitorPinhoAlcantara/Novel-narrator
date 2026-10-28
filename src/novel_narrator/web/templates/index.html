@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<form method="get" action="/" role="search">
+  <input type="search" name="q" value="{{ query }}" placeholder="Buscar novel por nome" aria-label="Buscar novel">
+  <button type="submit">Buscar</button>
+</form>
+<form method="get" action="/novel" role="search">
+  <input type="url" name="url" placeholder="Ou cole o link da novel" aria-label="Link da novel" required>
+  <button type="submit" class="secondary">Abrir</button>
+</form>
+
+{% if error %}<p class="bad">{{ error }}</p>{% endif %}
+<h2>{{ "Resultados" if query else "Mais populares" }}</h2>
+{% if novels %}
+<div class="cards">
+  {% for novel in novels %}
+  <article><a href="/novel?url={{ novel.url | urlencode }}">{{ novel.title }}</a></article>
+  {% endfor %}
+</div>
+{% else %}
+<p class="muted">Nenhuma novel encontrada.</p>
+{% endif %}
+
+{% if jobs %}
+<h2>Últimos trabalhos</h2>
+{% include "_jobs_table.html" %}
+{% endif %}
+{% endblock %}

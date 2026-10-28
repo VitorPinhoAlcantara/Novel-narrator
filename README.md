@@ -20,11 +20,19 @@ Download web novels and turn them into audiobooks narrated by a fine-tuned XTTS 
 ## Setup
 
 ```bash
-uv sync
-uv sync --extra tts
+uv sync --extra tts --extra web
 ```
 
-The first command installs the app; the second adds the TTS stack (PyTorch, XTTS, Whisper).
+`tts` adds the audio stack (PyTorch, XTTS, Whisper) and `web` the local web interface. Copy `config.example.toml` to `config.toml` and put the Audiobookshelf token in `.env` as `ABS_TOKEN=...`.
+
+## Usage
+
+```bash
+uv run novel-narrator
+uv run novel-narrator-web
+```
+
+The first opens the terminal menus; the second serves the web interface on http://127.0.0.1:8000.
 
 ## Development
 

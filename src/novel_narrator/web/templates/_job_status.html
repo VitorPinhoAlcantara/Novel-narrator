@@ -1,0 +1,21 @@
+<section id="status" {% if job.active %}hx-get="/jobs/{{ job.id }}/status" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
+  <p>
+    <strong>{{ status_names[job.status] }}</strong>
+    · {{ job.done }}/{{ job.total }} capítulos
+  </p>
+  <progress value="{{ job.done }}" max="{{ job.total or 1 }}" aria-label="Progresso"></progress>
+  {% if job.error %}<p class="bad">Erro: {{ job.error }}</p>{% endif %}
+  {% if job.failures %}
+  <h3>Capítulos com erro</h3>
+  <ul>
+    {% for failure in job.failures %}
+    <li>Vol. {{ failure.chapter.volume }} · Cap. {{ failure.chapter.number }} · {{ failure.chapter.title }} — <span class="bad">{{ failure.reason }}</span></li>
+    {% endfor %}
+  </ul>
+  {% if not job.active %}
+  <form method="post" action="/jobs/{{ job.id }}/retry"><button type="submit">Tentar de novo os que falharam</button></form>
+  {% endif %}
+  {% endif %}
+  <pre class="log">{% for line in job.lines %}{{ line }}
+{% else %}{{ "Aguardando o início..." if job.status == "queued" else "" }}{% endfor %}</pre>
+</section>

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}EPUB local · Novel Narrator{% endblock %}
+{% block content %}
+<h1>EPUB local</h1>
+<form method="get" action="/epub" role="search">
+  <input type="text" name="path" value="{{ path }}" placeholder="Caminho do arquivo .epub" aria-label="Caminho do EPUB" required>
+  <button type="submit">Abrir</button>
+</form>
+{% if error %}<p class="bad">{{ error }}</p>{% endif %}
+
+{% if book %}
+{% set novel = book.novel() %}
+{% set chapters = book.chapters() %}
+<article>
+  <hgroup>
+    <h2>{{ novel.title }}</h2>
+    <p>{{ novel.author or "Autor não informado" }} · {{ chapters | length }} capítulos com texto · capa: {{ "sim" if book.cover() else "não" }}</p>
+  </hgroup>
+  <p class="muted">Já vem marcado o que parece ser conteúdo; sumário, índice, notas e páginas curtas ficam desmarcados.</p>
+  <form method="post" action="/epub/run">
+    <input type="hidden" name="path" value="{{ book.path }}">
+    <fieldset>
+      {% for chapter in chapters %}
+      <label>
+        <input type="checkbox" name="chapters" value="{{ chapter.number }}" {% if chapter.suggested %}checked{% endif %}>
+        {{ chapter.number }}. {{ chapter.title[:80] }} <small class="muted">~{{ format_duration(estimate([chapter])) }}</small>
+      </label>
+      {% endfor %}
+    </fieldset>
+    {% if libraries %}
+    <label>
+      Biblioteca do Audiobookshelf
+      <select name="library">
+        {% for library in libraries %}
+        <option value="{{ library.name }}" {% if library.name == default_library %}selected{% endif %}>{{ library.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    <label><input type="checkbox" name="overwrite" role="switch"> Reescrever áudios que já existem</label>
+    <button type="submit">Gerar audiolivro</button>
+  </form>
+</article>
+{% endif %}
+{% endblock %}

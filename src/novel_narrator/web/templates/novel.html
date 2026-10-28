@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{{ novel.title }} · Novel Narrator{% endblock %}
+{% block content %}
+<article>
+  {% if novel.cover_url %}<img class="cover" src="{{ novel.cover_url }}" alt="Capa de {{ novel.title }}">{% endif %}
+  <hgroup>
+    <h1>{{ novel.title }}</h1>
+    <p>{{ novel.author or "Autor não informado" }} · {{ chapters | length }} capítulos · {{ volumes | length }} volumes</p>
+  </hgroup>
+
+  <form method="post" action="/novel/run">
+    <input type="hidden" name="url" value="{{ novel.url }}">
+    <fieldset>
+      <legend>Volumes completos</legend>
+      <div class="volumes">
+        {% for volume in volumes %}
+        <div>
+          <label><input type="checkbox" name="volumes" value="{{ volume.name }}"> Vol. {{ volume.name }}</label>
+          <small class="muted">caps {{ volume.first }}–{{ volume.last }} ({{ volume.count }})</small>
+        </div>
+        {% endfor %}
+      </div>
+    </fieldset>
+    <label>
+      Capítulos específicos
+      <input type="text" name="numbers" placeholder="ex.: 1,2,10-15">
+    </label>
+    <fieldset>
+      <legend>O que gerar</legend>
+      {% for value in ("cbz", "pdf", "audio") %}
+      <label>
+        <input type="checkbox" name="outputs" value="{{ value }}" {% if value in defaults %}checked{% endif %}>
+        {{ output_names[value] }}
+      </label>
+      {% endfor %}
+      <label><input type="checkbox" name="overwrite" role="switch"> Reescrever o que já existe</label>
+    </fieldset>
+    <button type="submit">Começar</button>
+  </form>
+</article>
+{% endblock %}

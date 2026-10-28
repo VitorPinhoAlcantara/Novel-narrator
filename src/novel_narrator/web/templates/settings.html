@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Configurações · Novel Narrator{% endblock %}
+{% block content %}
+<h1>Configurações</h1>
+{% set abs = config.abs %}
+<table>
+  <tbody>
+    <tr><th>Audiobookshelf</th><td>{{ abs.url or "não definido" }}</td></tr>
+    <tr><th>Token de API</th><td>{{ "definido" if abs.token else "não definido" }}</td></tr>
+    <tr><th>Biblioteca padrão</th><td>{{ abs.library or "não definida" }}</td></tr>
+    {% if abs.ssh %}
+    <tr><th>SSH</th><td>{{ abs.ssh }}</td></tr>
+    <tr><th>Pasta no servidor</th><td>{{ abs.remote_dir }}</td></tr>
+    {% else %}
+    <tr><th>Pasta local</th><td>{{ abs.local_dir or "não definida" }}</td></tr>
+    {% endif %}
+    <tr><th>Emoção por trecho</th><td>{{ "ligada" if config.tts.emotion.enabled else "desligada" }}</td></tr>
+    <tr><th>Voz</th><td>{{ config.tts.voice }}</td></tr>
+  </tbody>
+</table>
+<a href="/settings?test=1" role="button" class="secondary">Testar conexão</a>
+{% if checks %}
+<ul>
+  {% for ok, message in checks %}
+  <li class="{{ 'ok' if ok else 'bad' }}">{{ "OK" if ok else "FALHA" }}: {{ message }}</li>
+  {% endfor %}
+</ul>
+{% endif %}
+<p class="muted">Para alterar, use o menu "Configs ABS" do terminal (<code>novel-narrator</code>) ou edite o <code>config.toml</code> e reinicie.</p>
+{% endblock %}

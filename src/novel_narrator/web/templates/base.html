@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Novel Narrator{% endblock %}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.0.6/css/pico.min.css">
+  <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
+  <style>
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; }
+    .cards article { margin: 0; }
+    .volumes { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .5rem 1rem; }
+    .volumes small { display: block; margin-left: 2rem; line-height: 1.2; }
+    .cover { max-width: 160px; border-radius: .5rem; float: right; margin-left: 1rem; }
+    pre.log { max-height: 28rem; overflow: auto; font-size: .8rem; white-space: pre-wrap; }
+    .muted { color: var(--pico-muted-color); }
+    .ok { color: var(--pico-ins-color); }
+    .bad { color: var(--pico-del-color); }
+  </style>
+</head>
+<body>
+  <header class="container">
+    <nav>
+      <ul><li><a href="/"><strong>Novel Narrator</strong></a></li></ul>
+      <ul>
+        <li><a href="/">Novels</a></li>
+        <li><a href="/epub">EPUB local</a></li>
+        <li><a href="/jobs">Trabalhos</a></li>
+        <li><a href="/settings">Configurações</a></li>
+      </ul>
+    </nav>
+  </header>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

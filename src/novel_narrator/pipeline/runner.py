@@ -13,7 +13,16 @@ def describe_outputs(outputs):
 
 
 def run_chapters(
-    chapters, novel_title, outputs, fetch=None, audio=None, overwrite=False, parallel=3, lookahead=6, delay_s=0.3
+    chapters,
+    novel_title,
+    outputs,
+    fetch=None,
+    audio=None,
+    overwrite=False,
+    parallel=3,
+    lookahead=6,
+    delay_s=0.3,
+    on_done=None,
 ):
     if not chapters:
         print("Nenhum capitulo selecionado")
@@ -41,6 +50,8 @@ def run_chapters(
             log(chapter_tag(chapter, "OK"), status + extra)
         else:
             log(chapter_tag(chapter, "ERRO"), f"{status} | motivo: {reason}")
+        if on_done:
+            on_done(done, total)
 
     def fetch_and_record(index, chapter):
         record(index, chapter, *_safe(fetch, chapter))

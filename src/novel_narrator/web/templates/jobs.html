@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Trabalhos · Novel Narrator{% endblock %}
+{% block content %}
+<h1>Trabalhos</h1>
+{% if jobs %}
+{% include "_jobs_table.html" %}
+{% else %}
+<p class="muted">Nenhum trabalho ainda. Escolha uma novel ou um EPUB para começar.</p>
+{% endif %}
+{% endblock %}

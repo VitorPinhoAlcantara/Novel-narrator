@@ -1,11 +1,23 @@
 import threading
 
 _lock = threading.Lock()
+_listeners = []
 
 
 def log(tag, message):
     with _lock:
         print(f"[{tag}] {message}", flush=True)
+        for listener in _listeners:
+            listener(tag, message)
+
+
+def add_listener(listener):
+    _listeners.append(listener)
+
+
+def remove_listener(listener):
+    if listener in _listeners:
+        _listeners.remove(listener)
 
 
 def chapter_tag(chapter, stage=""):
