@@ -1,11 +1,14 @@
 """Interactive TUI menus for downloader and converter."""
 
 import os
+import zipfile
 
+import requests
 from InquirerPy import inquirer
 
+from .abs_api import bibliotecas_na_mesma_pasta, detectar_mapeamento, listar_bibliotecas, pasta_no_servidor
 from .audiolivro import SessaoAudiolivro, separar_pendentes
-from .audiolivro_config import carregar_config
+from .audiolivro_config import carregar_config, salvar_config
 from .config import DPI, QUALIDADE_JPG
 from .converter import converter_pdf_para_cbz, processar_pasta
 from .download_utils import gravar_log_falhas, resumir_capitulos
@@ -15,6 +18,8 @@ from .downloader import (
     download_capitulos_novel,
     separar_baixados,
 )
+from .epub_local import duracao_estimada_s, ler_epub
+from .log import formatar_duracao
 from .pdf_cleaner import limpar_pasta
 from .scraper import (
     buscar_novels_por_nome,
@@ -24,6 +29,7 @@ from .scraper import (
     obter_titulo_novel,
 )
 from .selection import parse_numero_lista_ou_intervalo
+from .servidor_abs import modo_remoto, verificar_destino
 from .texto_capitulo import obter_info_novel
 
 
@@ -33,17 +39,20 @@ def menu_principal():
         escolha = inquirer.select(
             message="CENTRALNOVEL - MAIN",
             choices=[
-                {"name": "Baixar / gerar (PDF, CBZ, Audiolivro)", "value": "download"},
-                {"name": "Conversao PDF -> CBZ", "value": "conversao"},
+                {"name": "CentralNovel (baixar novels: PDF, CBZ, audiolivro)", "value": "centralnovel"},
+                {"name": "EPUB local (gerar audiolivro de um arquivo .epub)", "value": "epub"},
+                {"name": "Configs ABS (servidor e biblioteca)", "value": "abs"},
                 {"name": "Sair", "value": "sair"},
             ],
             cycle=True,
         ).execute()
 
-        if escolha == "download":
+        if escolha == "centralnovel":
             menu_download()
-        elif escolha == "conversao":
-            menu_conversao()
+        elif escolha == "epub":
+            menu_epub()
+        elif escolha == "abs":
+            menu_config_abs()
         else:
             break
     _clear_screen()
@@ -124,6 +133,295 @@ def _processar_novel(novel, capitulos, config):
             sessao_audio=criar_sessao() if criar_sessao else None,
         )
         _tratar_falhas(resultado["falhas"], novel["title"], saidas, sobrescrever, criar_sessao)
+
+
+def menu_epub():
+    config = carregar_config()
+    _clear_screen()
+    caminho = _perguntar_epub()
+    if not caminho:
+        return
+    try:
+        livro = ler_epub(caminho)
+    except (zipfile.BadZipFile, KeyError, ValueError, OSError, AttributeError, TypeError) as exc:
+        print(f"[ERRO] Nao foi possivel ler o EPUB: {exc}")
+        inquirer.confirm(message="Voltar", default=True).execute()
+        return
+    if not livro["capitulos"]:
+        print("[ERRO] Nenhum texto encontrado nesse EPUB.")
+        inquirer.confirm(message="Voltar", default=True).execute()
+        return
+
+    _clear_screen()
+    print(f"Livro: {livro['titulo']}")
+    print(f"Autor: {livro['autor'] or '(nao informado no EPUB)'}")
+    print(f"Capa: {'sim' if livro['capa'] else 'nao'} | Capitulos com texto: {len(livro['capitulos'])}")
+    print("Ja vem marcado o que parece ser conteudo; sumario, indice, notas e paginas curtas ficam desmarcados.\n")
+    escolhidos = _checkbox_com_todos(
+        "Capitulos para virar audio",
+        [
+            {
+                "name": f"{c['indice']:>3}. {c['titulo'][:60]}  (~{formatar_duracao(duracao_estimada_s([c]))})",
+                "value": c,
+                "enabled": c["sugerido"],
+            }
+            for c in livro["capitulos"]
+        ],
+        f"[ Todos os {len(livro['capitulos'])} capitulos ]",
+        validate=lambda marcados: len(marcados) > 0,
+        invalid_message="Selecione pelo menos um capitulo",
+    )
+    if not escolhidos:
+        return
+
+    destino = _escolher_biblioteca(config, "Biblioteca do Audiobookshelf onde o livro vai aparecer")
+    if destino is None:
+        return
+    cfg = dict(config)
+    cfg.update(destino)
+
+    titulo = livro["titulo"]
+    capa = livro["capa"] or {}
+    info = {
+        "autor": livro["autor"] or cfg["autor_padrao"],
+        "capa": "",
+        "capa_dados": capa.get("dados"),
+        "capa_extensao": capa.get("extensao", "jpg"),
+        "epub_origem": caminho,
+    }
+    caps = [
+        {"capitulo": str(c["indice"]), "titulo": c["titulo"], "volume": "", "url": "", "livro": True,
+         "titulo_falado": "", "paragrafos": c["paragrafos"]}
+        for c in escolhidos
+    ]
+    try:
+        prontos, _ = separar_pendentes(caps, titulo, info, cfg)
+    except RuntimeError as exc:
+        print(f"[ERRO] Servidor do Audiobookshelf indisponivel: {exc}")
+        inquirer.confirm(message="Voltar", default=True).execute()
+        return
+    plano = _resolver_ja_baixados(caps, titulo, {"audio"}, {chave_capitulo(c) for c in prontos})
+    if plano is None:
+        return
+    caps, sobrescrever = plano
+    selecionados = [c for c in escolhidos if str(c["indice"]) in {cap["capitulo"] for cap in caps}]
+    audio_s = duracao_estimada_s(selecionados)
+
+    _clear_screen()
+    print(f"Livro: {titulo} | Autor: {info['autor']}")
+    print(f"Destino: biblioteca {cfg['abs_biblioteca']} ({cfg['abs_remote_dir'] if modo_remoto(cfg) else cfg['abs_dir']})")
+    print(f"Capitulos: {len(caps)} | audio estimado: ~{formatar_duracao(audio_s)} | "
+          f"tempo de geracao estimado: ~{formatar_duracao(audio_s * 0.75)}")
+    print("No Audiobookshelf ele aparece como um livro, com um arquivo por capitulo, a capa e o EPUB.")
+    if sobrescrever:
+        print("Audios ja existentes serao sobrescritos")
+    if not inquirer.confirm(message="Gerar o audiolivro?", default=True).execute():
+        return
+
+    def criar_sessao():
+        return SessaoAudiolivro(titulo, "", cfg["voz_padrao"], cfg, dict(info))
+
+    resultado = download_capitulos_novel(
+        caps, titulo, saidas={"audio"}, sobrescrever=sobrescrever, sessao_audio=criar_sessao()
+    )
+    _tratar_falhas(resultado["falhas"], titulo, {"audio"}, sobrescrever, criar_sessao)
+    inquirer.confirm(message="Voltar ao menu principal", default=True).execute()
+
+
+def _perguntar_epub():
+    print("Abrindo a janela para escolher o arquivo .epub...")
+    caminho = _seletor_de_arquivo()
+    if caminho:
+        return caminho
+
+    print("Nenhum arquivo escolhido na janela.")
+    caminho = _limpar_caminho(inquirer.filepath(
+        message="Arraste o arquivo .epub para esta janela ou cole o caminho (vazio volta):",
+        validate=lambda texto: _limpar_caminho(texto) == "" or _epub_valido(_limpar_caminho(texto)),
+        invalid_message="Informe um arquivo .epub que exista",
+    ).execute())
+    return caminho or None
+
+
+def _seletor_de_arquivo():
+    try:
+        import tkinter
+        from tkinter import filedialog
+
+        raiz = tkinter.Tk()
+        raiz.withdraw()
+        raiz.attributes("-topmost", True)
+        try:
+            caminho = filedialog.askopenfilename(
+                parent=raiz,
+                title="Escolha o arquivo .epub",
+                initialdir=os.path.join(os.path.expanduser("~"), "Downloads"),
+                filetypes=[("Livros EPUB", "*.epub"), ("Todos os arquivos", "*.*")],
+            )
+        finally:
+            raiz.destroy()
+    except Exception:
+        return None
+    caminho = os.path.normpath(caminho) if caminho else ""
+    return caminho if _epub_valido(caminho) else None
+
+
+def _limpar_caminho(texto):
+    texto = texto.strip()
+    if texto.startswith("& "):
+        texto = texto[2:].strip()
+    return texto.strip("'\"").strip()
+
+
+def _epub_valido(caminho):
+    return bool(caminho) and caminho.lower().endswith(".epub") and os.path.isfile(caminho)
+
+
+def _escolher_biblioteca(config, mensagem):
+    try:
+        bibliotecas = listar_bibliotecas(config)
+    except requests.RequestException as exc:
+        print(f"[ERRO] Nao foi possivel listar as bibliotecas do Audiobookshelf: {exc}")
+        print("Confira o endereco e o token em Configs ABS.")
+        inquirer.confirm(message="Voltar", default=True).execute()
+        return None
+    if not bibliotecas:
+        print("[ERRO] O Audiobookshelf nao tem nenhuma biblioteca.")
+        inquirer.confirm(message="Voltar", default=True).execute()
+        return None
+
+    padrao = next((b for b in bibliotecas if b["nome"] == config.get("abs_biblioteca")), bibliotecas[0])
+    escolhida = inquirer.select(
+        message=mensagem,
+        choices=[{"name": f"{b['nome']}  (pasta: {', '.join(b['pastas']) or '?'})", "value": b} for b in bibliotecas]
+        + [{"name": "Cancelar", "value": None}],
+        default=padrao,
+        cycle=True,
+    ).execute()
+    if escolhida is None:
+        return None
+    if not escolhida["pastas"]:
+        print("[ERRO] Essa biblioteca nao tem pasta configurada no Audiobookshelf.")
+        inquirer.confirm(message="Voltar", default=True).execute()
+        return None
+    pasta = escolhida["pastas"][0]
+    if len(escolhida["pastas"]) > 1:
+        pasta = inquirer.select(message="Pasta da biblioteca", choices=escolhida["pastas"]).execute()
+
+    outras = bibliotecas_na_mesma_pasta(bibliotecas, escolhida, pasta)
+    if outras:
+        print(f"\n[AVISO] A pasta {pasta} tambem e usada pela(s) biblioteca(s): {', '.join(outras)}.")
+        print("Tudo o que for enviado aparece nas duas. Para separar, cada biblioteca precisa de uma pasta propria.")
+        if not inquirer.confirm(message="Continuar mesmo assim?", default=False).execute():
+            return None
+
+    alteracoes = {"abs_biblioteca": escolhida["nome"]}
+    if modo_remoto(config):
+        no_servidor = pasta_no_servidor(pasta, detectar_mapeamento(config))
+        if no_servidor is None:
+            print(f"Nao consegui descobrir automaticamente onde fica {pasta} no servidor.")
+            no_servidor = inquirer.text(
+                message=f"Caminho no servidor que corresponde a {pasta}:", default=config.get("abs_remote_dir", "")
+            ).execute().strip()
+            if not no_servidor:
+                return None
+        alteracoes["abs_remote_dir"] = no_servidor
+    return alteracoes
+
+
+def menu_config_abs():
+    while True:
+        config = carregar_config()
+        _clear_screen()
+        print("CONFIGS DO AUDIOBOOKSHELF")
+        print("=" * 50)
+        print(f"Endereco (URL):       {config['abs_url']}")
+        print(f"Token de API:         {_mascarar(config.get('abs_token', ''))}")
+        print(f"Acesso SSH:           {config.get('abs_ssh') or '(sem SSH: grava na pasta local abs_dir)'}")
+        if modo_remoto(config):
+            print(f"Pasta no servidor:    {config['abs_remote_dir']}")
+        else:
+            print(f"Pasta local:          {config.get('abs_dir') or '(nao definida)'}")
+        print(f"Biblioteca padrao:    {config.get('abs_biblioteca') or '(nao definida)'}  (usada pela CentralNovel)")
+        print("=" * 50)
+        escolha = inquirer.select(
+            message="O que alterar?",
+            choices=[
+                {"name": "Biblioteca padrao (lista as bibliotecas do servidor)", "value": "biblioteca"},
+                {"name": "Endereco do servidor (URL)", "value": "url"},
+                {"name": "Token de API", "value": "token"},
+                {"name": "Acesso SSH (usuario@host)", "value": "ssh"},
+                {"name": "Testar conexao", "value": "testar"},
+                {"name": "Voltar", "value": "voltar"},
+            ],
+            cycle=True,
+        ).execute()
+        if escolha == "voltar":
+            return
+        if escolha == "biblioteca":
+            alteracoes = _escolher_biblioteca(config, "Biblioteca padrao")
+            if alteracoes:
+                salvar_config(alteracoes)
+                print("Salvo.")
+        elif escolha == "url":
+            url = inquirer.text(
+                message="Endereco do Audiobookshelf (ex.: http://192.168.15.3:13378):", default=config["abs_url"],
+                validate=lambda t: t.strip().startswith(("http://", "https://")),
+                invalid_message="Comece com http:// ou https://",
+            ).execute().strip().rstrip("/")
+            if _testar_api(config, url=url) or inquirer.confirm(message="Nao respondeu. Salvar mesmo assim?", default=False).execute():
+                salvar_config({"abs_url": url})
+                print("Salvo.")
+        elif escolha == "token":
+            token = inquirer.secret(message="Novo token (ABS > Configuracoes > Usuarios > seu usuario > API token):").execute().strip()
+            if token and (_testar_api(config, token=token)
+                          or inquirer.confirm(message="Token recusado. Salvar mesmo assim?", default=False).execute()):
+                salvar_config({"abs_token": token})
+                print("Salvo.")
+        elif escolha == "ssh":
+            ssh = inquirer.text(message="Acesso SSH (usuario@host; vazio = gravar em pasta local):",
+                                default=config.get("abs_ssh", "")).execute().strip()
+            teste = dict(config, abs_ssh=ssh)
+            erro = verificar_destino(teste) if ssh else None
+            if erro:
+                print(f"[AVISO] {erro}")
+            if not erro or inquirer.confirm(message="Salvar mesmo assim?", default=False).execute():
+                salvar_config({"abs_ssh": ssh})
+                print("Salvo.")
+        elif escolha == "testar":
+            _testar_tudo(config)
+        inquirer.confirm(message="Continuar", default=True).execute()
+
+
+def _mascarar(token):
+    return f"definido (termina em ...{token[-4:]})" if token else "(nao definido)"
+
+
+def _testar_api(config, url=None, token=None):
+    try:
+        bibliotecas = listar_bibliotecas(config, url=url, token=token)
+    except requests.RequestException as exc:
+        print(f"[FALHA] API do Audiobookshelf: {exc}")
+        return False
+    print(f"[OK] API respondeu: {len(bibliotecas)} biblioteca(s): {', '.join(b['nome'] for b in bibliotecas)}")
+    return True
+
+
+def _testar_tudo(config):
+    _testar_api(config)
+    if not modo_remoto(config):
+        erro = verificar_destino(config)
+        print(f"[{'FALHA' if erro else 'OK'}] Pasta local: {erro or config['abs_dir']}")
+        return
+    erro = verificar_destino(config)
+    print(f"[{'FALHA' if erro else 'OK'}] SSH e pasta no servidor: {erro or config['abs_remote_dir']}")
+    mapa = detectar_mapeamento(config)
+    if mapa:
+        print("[OK] Pastas do container detectadas:")
+        for dentro, fora in sorted(mapa.items()):
+            print(f"       {dentro}  ->  {fora}")
+    else:
+        print("[AVISO] Nao consegui ler as pastas do container (docker inspect via SSH).")
 
 
 def menu_conversao():
@@ -324,16 +622,32 @@ def _selecionar_capitulos(capitulos):
 
 def _selecionar_volumes(capitulos):
     volumes_disponiveis = _listar_volumes(capitulos)
-    selecionados = inquirer.checkbox(
-        message="Selecione um ou mais volumes (espaco marca, enter confirma)",
-        choices=[{"name": volume, "value": volume} for volume in volumes_disponiveis],
-        cycle=True,
-        height=min(20, len(volumes_disponiveis) + 2),
-    ).execute()
+    selecionados = _checkbox_com_todos(
+        "Selecione um ou mais volumes",
+        [{"name": volume, "value": volume} for volume in volumes_disponiveis],
+        f"[ Todos os {len(volumes_disponiveis)} volumes ]",
+        altura_max=20,
+    )
     if not selecionados:
         return []
     volumes_set = set(selecionados)
     return [item for item in capitulos if item["volume"] in volumes_set]
+
+
+_TODOS = "__todos__"
+
+
+def _checkbox_com_todos(mensagem, opcoes, rotulo_todos, altura_max=25, **extras):
+    escolhidos = inquirer.checkbox(
+        message=f"{mensagem} (espaco marca, ctrl+a marca todos, ctrl+r inverte, enter confirma)",
+        choices=[{"name": rotulo_todos, "value": _TODOS}] + opcoes,
+        cycle=True,
+        height=min(altura_max, len(opcoes) + 3),
+        **extras,
+    ).execute()
+    if any(isinstance(item, str) and item == _TODOS for item in escolhidos):
+        return [opcao["value"] for opcao in opcoes]
+    return escolhidos
 
 
 def _perguntar_saidas(anteriores=None):

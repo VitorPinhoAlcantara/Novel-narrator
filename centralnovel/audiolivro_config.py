@@ -4,8 +4,10 @@ Os valores ficam em `audiobook_config.json` (criado na primeira execucao, fora d
 porque guarda o token do Audiobookshelf). O token tambem pode vir da variavel ABS_TOKEN.
 """
 
+import hashlib
 import json
 import os
+import re
 
 RAIZ_PROJETO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ARQUIVO_CONFIG = "audiobook_config.json"
@@ -90,3 +92,24 @@ def _mesclar(base, novo):
             _mesclar(base[chave], valor)
         else:
             base[chave] = valor
+
+
+def salvar_config(alteracoes):
+    dados = {}
+    if os.path.exists(ARQUIVO_CONFIG):
+        with open(ARQUIVO_CONFIG, "r", encoding="utf-8") as arquivo:
+            dados = json.load(arquivo)
+    dados.update(alteracoes)
+    temporario = ARQUIVO_CONFIG + ".tmp"
+    with open(temporario, "w", encoding="utf-8") as arquivo:
+        json.dump(dados, arquivo, indent=2, ensure_ascii=False)
+    os.replace(temporario, ARQUIVO_CONFIG)
+
+
+def pasta_espera(config):
+    if not config.get("abs_ssh"):
+        return PASTA_ESPERA
+    remota = str(config.get("abs_remote_dir", ""))
+    nome = re.sub(r"[^A-Za-z0-9]+", "_", os.path.basename(remota.rstrip("/"))).strip("_") or "destino"
+    assinatura = hashlib.sha1(f"{config['abs_ssh']}:{remota}".encode("utf-8")).hexdigest()[:10]
+    return os.path.join(PASTA_ESPERA, f"{nome}_{assinatura}")

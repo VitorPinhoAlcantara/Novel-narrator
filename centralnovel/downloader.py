@@ -22,21 +22,21 @@ from .config import (
 from .converter import converter_pdf_para_cbz
 from .csv_store import carregar_links_csv
 from .download_utils import limpar_nome_arquivo
+from .log import etiqueta_cap, formatar_duracao, log, rotulo_capitulo
 from .pdf_cleaner import limpar_pdf
 from .scraper import obter_token_pdf
 
 
-def baixar_pdf(post_id, url_pdf_page, caminho_destino, tentativa=1, sobrescrever=False):
+def baixar_pdf(post_id, url_pdf_page, caminho_destino, tentativa=1, sobrescrever=False, etiqueta="PDF"):
     """Retorna (sucesso, motivo_do_erro)."""
     caminho_tmp = f"{caminho_destino}.part"
     try:
         if os.path.exists(caminho_destino) and not sobrescrever:
-            print(f"Ja existe: {os.path.basename(caminho_destino)}")
+            log(etiqueta, "PDF ja existia, nada a baixar")
             return True, None
 
         pdf_url_com_token = obter_token_pdf(post_id, url_pdf_page)
         if not pdf_url_com_token:
-            print("Nao foi possivel obter token")
             return False, "Nao foi possivel obter token"
 
         time.sleep(0.5)
@@ -52,31 +52,26 @@ def baixar_pdf(post_id, url_pdf_page, caminho_destino, tentativa=1, sobrescrever
                     file_obj.write(chunk)
 
         if os.path.getsize(caminho_tmp) < 1000:
-            print("Arquivo muito pequeno, pode estar corrompido")
             return False, "Arquivo baixado muito pequeno (possivelmente corrompido)"
 
         try:
             limpar_pdf(caminho_tmp)
         except Exception as exc:
-            print(f"Aviso: nao foi possivel limpar o PDF: {exc}")
+            log(etiqueta, f"AVISO: nao foi possivel limpar o PDF: {exc}")
 
         # o arquivo antigo so e trocado depois que o novo foi baixado por completo
         os.replace(caminho_tmp, caminho_destino)
-        print(
-            f"Baixado: {os.path.basename(caminho_destino)} "
-            f"({os.path.getsize(caminho_destino)} bytes)"
-        )
+        log(etiqueta, f"PDF baixado ({os.path.getsize(caminho_destino) / 1024:.0f} KB)")
         return True, None
     except requests.exceptions.HTTPError as exc:
         if exc.response.status_code == 429 and tentativa < MAX_RETRIES:
             wait_time = DELAY_ENTRE_DOWNLOADS * tentativa * 2
-            print(f"Erro 429. Aguardando {wait_time}s...")
+            log(etiqueta, f"AVISO: o site limitou os pedidos (erro 429); aguardando {wait_time}s "
+                          f"e tentando de novo (tentativa {tentativa + 1} de {MAX_RETRIES})")
             time.sleep(wait_time)
-            return baixar_pdf(post_id, url_pdf_page, caminho_destino, tentativa + 1, sobrescrever)
-        print(f"Erro HTTP: {exc}")
+            return baixar_pdf(post_id, url_pdf_page, caminho_destino, tentativa + 1, sobrescrever, etiqueta)
         return False, f"Erro HTTP: {exc}"
     except Exception as exc:
-        print(f"Erro: {exc}")
         return False, f"Erro: {exc}"
     finally:
         if os.path.exists(caminho_tmp):
@@ -127,31 +122,37 @@ def download_capitulos_novel(capitulos, novel_title, saidas=None, sobrescrever=F
     com_audio = "audio" in saidas
     paralelos = 1 if com_audio else MAX_DOWNLOADS_PARALELOS
 
-    if com_audio:
-        print(f"\nIniciando {total} capitulos (downloads um por vez, ate {MAX_CAPITULOS_A_FRENTE} a frente do audio)")
+    print("\n" + "=" * 70)
+    print(f"{novel_title} | {total} capitulo(s) | saidas: {descrever_saidas(saidas)}")
+    if saidas == {"audio"}:
+        print("Somente audio: nao ha PDF/CBZ para baixar.")
+    elif com_audio:
+        print(f"Downloads um por vez, no maximo {MAX_CAPITULOS_A_FRENTE} capitulos a frente do audio.")
     else:
-        print(f"\nIniciando {total} capitulos ({paralelos} em paralelo)")
-    print(f"Saidas: {descrever_saidas(saidas)}")
+        print(f"Downloads: {paralelos} em paralelo.")
+    print("Cada linha traz o capitulo e a etapa: [Cap 152 download] = baixando PDF/CBZ,")
+    print("[Cap 147 audio] = gerando o audio, [Cap 147 OK] = capitulo concluido, [Envio] = servidor.")
     if sobrescrever:
-        print("Arquivos ja existentes serao sobrescritos")
+        print("Arquivos ja existentes serao sobrescritos.")
+    print("=" * 70)
 
     resultado_lock = Lock()
     contadores = {"sucesso": 0, "concluidos": 0}
     falhas = []
 
-    def _registrar(indice, cap, sucesso, motivo):
+    def _registrar(indice, cap, sucesso, motivo, extra=""):
         with resultado_lock:
             contadores["concluidos"] += 1
             if sucesso:
                 contadores["sucesso"] += 1
             else:
                 falhas.append({"indice": indice, "cap": cap, "motivo": motivo})
-            print(
-                f"\n[{contadores['concluidos']}/{total}] "
-                f"Vol. {cap['volume']} Cap. {cap['capitulo']}: {cap['titulo']}"
-            )
-            if not sucesso:
-                print(f"ERRO: {motivo}")
+            feitos = contadores["concluidos"]
+            situacao = f"{feitos}/{total} concluidos, restam {total - feitos} | {rotulo_capitulo(cap)}"
+            if sucesso:
+                log(etiqueta_cap(cap, "OK"), situacao + extra)
+            else:
+                log(etiqueta_cap(cap, "ERRO"), f"{situacao} | motivo: {motivo}")
 
     def _processar_capitulo(indice, cap):
         try:
@@ -203,25 +204,39 @@ def _executar_com_audio(capitulos, novel_dir, saidas, sobrescrever, sessao_audio
 
     thread = threading.Thread(target=produtor, daemon=True)
     thread.start()
+    tempos = []
     try:
         while True:
             item = fila.get()
             if item is None:
                 break
             indice, cap, sucesso, motivo = item
+            extra = ""
             try:
                 if sucesso and sessao_audio.pendente(cap, sobrescrever):
+                    log(etiqueta_cap(cap, "audio"),
+                        f"comecando o audio (item {indice + 1} de {len(capitulos)} da lista)")
+                    inicio = time.time()
                     sucesso, motivo = sessao_audio.gerar_capitulo(cap)
+                    if sucesso:
+                        tempos.append(time.time() - inicio)
+                        restantes = sum(1 for c in capitulos[indice + 1:] if sessao_audio.pendente(c, sobrescrever))
+                        if restantes:
+                            media = sum(tempos[-10:]) / len(tempos[-10:])
+                            extra = f" | faltam {restantes} audio(s), previsao ~{formatar_duracao(restantes * media)}"
+                elif sucesso:
+                    log(etiqueta_cap(cap, "audio"), "ja existe no servidor, pulando")
             except Exception as exc:
                 sucesso, motivo = False, f"Erro inesperado: {exc}"
             vagas.release()
-            registrar(indice, cap, sucesso, motivo)
+            registrar(indice, cap, sucesso, motivo, extra)
     finally:
         parar.set()
         vagas.release()
 
 
 def _baixar_saidas_capitulo(cap, novel_dir, saidas, sobrescrever):
+    etiqueta = etiqueta_cap(cap, "download")
     caminho_pdf = _montar_caminho_pdf(cap, novel_dir)
     caminho_cbz = _montar_caminho_cbz(cap, novel_dir)
 
@@ -231,7 +246,7 @@ def _baixar_saidas_capitulo(cap, novel_dir, saidas, sobrescrever):
     if quer_pdf or quer_cbz:
         pdf_existia = os.path.exists(caminho_pdf)
         sucesso, motivo = baixar_pdf(
-            cap.get("post_id"), cap["url"], caminho_pdf, sobrescrever=sobrescrever
+            cap.get("post_id"), cap["url"], caminho_pdf, sobrescrever=sobrescrever, etiqueta=etiqueta
         )
         if not sucesso:
             return False, motivo
@@ -245,7 +260,7 @@ def _baixar_saidas_capitulo(cap, novel_dir, saidas, sobrescrever):
             )
             if not cbz_gerado:
                 return False, "Falha na conversao para CBZ"
-            print(f"CBZ gerado: {os.path.basename(cbz_gerado)}")
+            log(etiqueta, "CBZ gerado")
             if "pdf" not in saidas and not pdf_existia:
                 os.remove(caminho_pdf)
     return True, None

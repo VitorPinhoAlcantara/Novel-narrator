@@ -27,7 +27,8 @@ def resumir_capitulos(capitulos):
     for cap in capitulos:
         por_volume.setdefault(str(cap["volume"]), set()).add(int(cap["capitulo"]))
     partes = [
-        f"Vol {volume}: {_comprimir_intervalos(sorted(numeros))}"
+        f"Vol {volume}: {_comprimir_intervalos(sorted(numeros))}" if volume.strip()
+        else f"Caps {_comprimir_intervalos(sorted(numeros))}"
         for volume, numeros in por_volume.items()
     ]
     return " | ".join(partes)

@@ -95,16 +95,35 @@ def montar_capitulo(trechos, pasta_wavs, saida_wav, pausa_inicial_ms=600, pausa_
     return len(audio) / TAXA
 
 
+def duracao_arquivo(caminho):
+    resultado = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", caminho],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+    )
+    try:
+        return float(resultado.stdout.strip())
+    except ValueError:
+        return 0.0
+
+
 def codificar_m4b(wav, destino, metadados, bitrate="96k", loudnorm=True):
     os.makedirs(os.path.dirname(os.path.abspath(destino)), exist_ok=True)
+    temporario = destino + ".part"
     cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", wav, "-vn"]
     if loudnorm:
         cmd += ["-af", "loudnorm=I=-18:TP=-1.5:LRA=11"]
     cmd += ["-ac", "1", "-ar", "44100", "-c:a", "aac", "-b:a", bitrate]
     for chave, valor in metadados.items():
         cmd += ["-metadata", f"{chave}={valor}"]
-    cmd += ["-movflags", "+faststart+use_metadata_tags", destino]
-    resultado = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
-    if resultado.returncode != 0:
-        raise RuntimeError(f"ffmpeg: {resultado.stderr.strip()[:300]}")
+    cmd += ["-movflags", "+faststart+use_metadata_tags", "-f", "ipod", temporario]
+    try:
+        resultado = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        if resultado.returncode != 0:
+            raise RuntimeError(f"ffmpeg: {resultado.stderr.strip()[:300]}")
+        if duracao_arquivo(temporario) <= 0:
+            raise RuntimeError("ffmpeg gerou um arquivo sem duracao")
+        os.replace(temporario, destino)
+    finally:
+        if os.path.exists(temporario):
+            os.remove(temporario)
     return destino

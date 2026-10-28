@@ -6,6 +6,7 @@ import threading
 import time
 
 from . import gpu
+from ..log import log
 
 RAIZ_PROJETO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -152,7 +153,7 @@ class PoolTTS:
             for worker in novos:
                 worker.esperar_pronto()
         except Exception as exc:
-            print(f"Aviso: nao foi possivel iniciar mais workers: {exc}")
+            log("XTTS", f"AVISO: nao foi possivel iniciar mais workers: {exc}")
             for worker in novos:
                 worker.encerrar()
             novos = []
@@ -191,7 +192,7 @@ class PoolTTS:
             elif livre > folga and self.limite_vivo < len(self.workers):
                 self.limite_vivo += 1
             if self.limite_vivo != anterior:
-                print(f"  VRAM livre {livre} MB: workers ativos {anterior} -> {self.limite_vivo}")
+                log("GPU", f"VRAM livre {livre} MB: workers de XTTS ativos {anterior} -> {self.limite_vivo}")
 
     def gerar(self, jobs, ao_concluir=None):
         fila = queue.Queue()

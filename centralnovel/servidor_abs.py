@@ -92,7 +92,7 @@ def enviar_espera(config, pasta_espera):
             with tarfile.open(fileobj=proc.stdin, mode="w|", format=tarfile.PAX_FORMAT,
                               encoding="utf-8") as pacote:
                 for nome in sorted(os.listdir(pasta_espera)):
-                    pacote.add(os.path.join(pasta_espera, nome), arcname=nome)
+                    pacote.add(os.path.join(pasta_espera, nome), arcname=nome, filter=_sem_temporarios)
         except (OSError, BrokenPipeError):
             pass  # o erro real vem do codigo de saida e do stderr do ssh
         finally:
@@ -118,10 +118,16 @@ def _arquivos_locais(pasta):
     arquivos = {}
     for raiz, _, nomes in os.walk(pasta):
         for nome in nomes:
+            if nome.endswith(".part"):
+                continue
             caminho = os.path.join(raiz, nome)
             rel = os.path.relpath(caminho, pasta).replace(os.sep, "/")
             arquivos[rel] = os.path.getsize(caminho)
     return arquivos
+
+
+def _sem_temporarios(info):
+    return None if info.name.endswith(".part") else info
 
 
 def _conferir_tamanhos(config, arquivos):

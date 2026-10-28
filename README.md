@@ -16,10 +16,18 @@ python main.py
 A navegacao agora e interativa no terminal (setas/espaco/enter), com limpeza de tela ao trocar de menu.
 
 Menu principal:
-1. Download de novel
-2. Conversao PDF -> CBZ
-3. Gerar audiolivro (Audiobookshelf)
+1. **CentralNovel**: baixar novels do site (PDF, CBZ e/ou audiolivro)
+2. **EPUB local**: gerar audiolivro a partir de um arquivo `.epub` do computador
+3. **Configs ABS**: endereco, token, acesso SSH e biblioteca padrao do Audiobookshelf
 4. Sair
+
+## EPUB local
+
+Escolha o arquivo `.epub` (Tab completa o caminho). O programa le titulo, autor, capa e o sumario, e lista os capitulos com a duracao estimada; ja vem marcado o que parece conteudo (sumario, indice, notas, ficha catalografica e paginas curtas ficam desmarcados). Depois escolha a biblioteca do Audiobookshelf de destino. No servidor o livro fica em `<Autor>/<Livro>/001 - <Capitulo>.m4b`, com a capa e o proprio EPUB na pasta, e o ABS mostra um livro com um arquivo por capitulo. Notas de rodape (numeros sobrescritos) nao sao lidas. Interromper e retomar funciona igual ao das novels.
+
+## Configs ABS
+
+Mostra a configuracao atual e permite trocar o endereco, o token, o acesso SSH e a biblioteca padrao (usada pela CentralNovel). As bibliotecas sao listadas pela API do Audiobookshelf, e a pasta do servidor correspondente a cada uma e descoberta automaticamente lendo as montagens do container (`docker inspect` via SSH). Se duas bibliotecas usarem a mesma pasta, o programa avisa: tudo o que for enviado aparece nas duas. "Testar conexao" confere a API, o SSH e as pastas detectadas.
 
 ## Fluxo de download
 
@@ -114,7 +122,9 @@ Estrutura gravada (o Audiobookshelf junta os arquivos da pasta em um unico livro
 <abs_dir>/<Autor>/<Novel>/Vol. 2 - <Novel> Volume 2/<Novel> Volume 2.epub
 ```
 
-Capitulos que ja existem no servidor sao ignorados, e um capitulo interrompido retoma dos trechos ja gerados.
+Capitulos que ja existem no servidor sao ignorados.
+
+**Interrupcao (Ctrl+C).** O capitulo em andamento nao e enviado ao servidor: o `.m4b` so existe depois de pronto (e gravado como `.part` e renomeado no fim). Os trechos ja gerados ficam guardados em `audiobook_work/<Novel>/cap_<volume>_<numero>/`, e os capitulos que ja estavam concluidos mas aguardavam o envio em lote sao enviados na saida. Para continuar, selecione o volume de novo e escolha **"Processar apenas os faltantes"**: o capitulo interrompido nao esta no servidor, entao volta a ser pendente e retoma dos trechos guardados (os que ja foram gerados mas nao verificados pelo Whisper so sao verificados, nao regenerados). Audios incompletos que tenham sobrado na pasta de espera sao descartados para `audiobook_work/descartados/` antes de qualquer envio.
 
 ### Ambiente do TTS
 
