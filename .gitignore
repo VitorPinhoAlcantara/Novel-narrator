@@ -7,6 +7,8 @@ config.toml
 data/
 models/
 voices/
+PDF/
+CBZ/
 .venv/
 __pycache__/
 *.py[cod]

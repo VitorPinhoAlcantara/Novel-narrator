@@ -271,10 +271,17 @@ def _chapter_order(chapter):
     return (1, _simplify(chapter.volume), chapter.number)
 
 
-def _is_noise(text):
-    if _RE_SITE_URL.search(text):
-        return True
+def has_site_link(text):
+    return bool(_RE_SITE_URL.search(text))
+
+
+def is_translation_mark(text):
+    text = " ".join(text.split())
     return len(text) <= _MAX_MARK_LENGTH and bool(_RE_TRANSLATION_MARK.search(text))
+
+
+def _is_noise(text):
+    return has_site_link(text) or is_translation_mark(text)
 
 
 def _dedupe(novels):

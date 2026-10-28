@@ -10,6 +10,8 @@ DEFAULTS = {
         "data_dir": "data",
         "voices_dir": "voices",
         "model_dir": "models/xtts_narrator",
+        "pdf_dir": "PDF",
+        "cbz_dir": "CBZ",
         "tts_python": "",
     },
     "outputs": {"audiobook": True, "cbz": True, "pdf": False},
