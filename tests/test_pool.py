@@ -49,7 +49,6 @@ def test_job_requeued_after_a_crash_runs_on_a_live_worker(pool, tmp_path):
 
 def test_command_points_to_emotion_dir_only_when_enabled(tmp_path):
     config = copy.deepcopy(DEFAULTS)
-    command = TTSPool(config, ["v.wav"])._command()
-    assert "--emotion-dir" in command
-    config["tts"]["emotion"]["enabled"] = False
     assert "--emotion-dir" not in TTSPool(config, ["v.wav"])._command()
+    config["tts"]["emotion"]["enabled"] = True
+    assert "--emotion-dir" in TTSPool(config, ["v.wav"])._command()

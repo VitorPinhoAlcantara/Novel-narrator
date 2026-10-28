@@ -70,7 +70,7 @@ gpt_cond_chunk_len = 6
 max_ref_length = 30
 
 [tts.emotion]
-enabled = true
+enabled = false
 
 [tts.asr]
 enabled = true

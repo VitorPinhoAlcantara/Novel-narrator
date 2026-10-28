@@ -39,7 +39,7 @@ DEFAULTS = {
         "xtts": {"temperature": 0.55, "repetition_penalty": 2.0, "top_k": 30, "top_p": 0.7, "speed": 1.1},
         "reference": {"gpt_cond_len": 30, "gpt_cond_chunk_len": 6, "max_ref_length": 30},
         "qa": {},
-        "emotion": {"enabled": True},
+        "emotion": {"enabled": False},
         "asr": {
             "enabled": True,
             "model": "openai/whisper-small",
