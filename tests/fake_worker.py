@@ -1,12 +1,15 @@
 import json
 import os
 import sys
+import time
 
 print(json.dumps({"event": "ready"}), flush=True)
 for line in sys.stdin:
     job = json.loads(line)
     if job.get("cmd") == "quit":
         break
+    if job["text"] == "slow":
+        time.sleep(30)
     if job["text"] == "die":
         sys.exit(1)
     if job["text"] == "die_once" and not os.path.exists(job["flag"]):

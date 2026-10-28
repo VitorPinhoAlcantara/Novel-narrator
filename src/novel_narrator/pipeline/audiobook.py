@@ -26,7 +26,7 @@ from novel_narrator.tts.assemble import (
     file_duration,
 )
 from novel_narrator.tts.gpu import choose_workers
-from novel_narrator.tts.pool import TTSPool
+from novel_narrator.tts.pool import Interrupted, TTSPool
 from novel_narrator.tts.verify import analyze, has_similar_word, words
 
 
@@ -84,6 +84,7 @@ class AudiobookSession:
         self.author = novel.author or config["audiobook"]["default_author"]
         self.existing = set()
         self.pool = None
+        self.aborted = False
         self.published = []
         self.covered_folders = set()
         self._cover = None
@@ -99,6 +100,8 @@ class AudiobookSession:
         return self._relative(chapter) not in self.existing
 
     def generate_chapter(self, chapter):
+        if self.aborted:
+            raise Interrupted()
         self.prepare()
         if self._prepare_error:
             return False, self._prepare_error
@@ -129,7 +132,7 @@ class AudiobookSession:
         self._log(f"{chapter_label(chapter)} | texto dividido em {len(segments)} trechos")
         try:
             results = self._synthesize(chapter, segments, folder)
-        except KeyboardInterrupt:
+        except (KeyboardInterrupt, Interrupted):
             saved = len([n for n in os.listdir(folder) if n.endswith(".wav")]) if os.path.isdir(folder) else 0
             self._log(
                 f"INTERROMPIDO: {saved} de {len(segments)} trechos guardados em {folder}. "
@@ -167,6 +170,11 @@ class AudiobookSession:
         if len(self.published) >= max(1, int(self.config["audiobook"]["batch_chapters"])):
             self._publish_batch()
         return True, None
+
+    def abort(self):
+        self.aborted = True
+        if self.pool is not None:
+            self.pool.abort()
 
     def close(self):
         try:
@@ -260,12 +268,15 @@ class AudiobookSession:
         self._announce_workers(n, reading)
         pool = TTSPool(self.config, [self._voice_path()], workers=n)
         log("XTTS", f"carregando o modelo em {pool.n_workers} worker(s) (cerca de 1 minuto)...")
+        self.pool = pool
         try:
             pool.start()
         except Exception as exc:
+            self.pool = None
+            if self.aborted:
+                raise Interrupted() from exc
             raise RuntimeError(f"falha ao iniciar o XTTS: {exc}") from exc
         log("XTTS", "modelo carregado e pronto")
-        self.pool = pool
 
     def _announce_workers(self, n, reading):
         if reading:

@@ -64,6 +64,7 @@ def test_popular_keeps_only_unique_novel_links():
         ("Novel Teste", NOVEL_URL),
         ("Outra Novel", "https://centralnovel.com/series/outra-novel/"),
     ]
+    assert [n.cover_url for n in novels] == ["https://img.test/capa.png?resize=151,215", ""]
 
 
 def test_sitemap_titles_come_from_slug():

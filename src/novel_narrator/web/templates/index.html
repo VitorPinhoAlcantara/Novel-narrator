@@ -1,28 +1,46 @@
 {% extends "base.html" %}
 {% block content %}
-<form method="get" action="/" role="search">
-  <input type="search" name="q" value="{{ query }}" placeholder="Buscar novel por nome" aria-label="Buscar novel">
-  <button type="submit">Buscar</button>
-</form>
-<form method="get" action="/novel" role="search">
-  <input type="url" name="url" placeholder="Ou cole o link da novel" aria-label="Link da novel" required>
-  <button type="submit" class="secondary">Abrir</button>
-</form>
-
-{% if error %}<p class="bad">{{ error }}</p>{% endif %}
-<h2>{{ "Resultados" if query else "Mais populares" }}</h2>
-{% if novels %}
-<div class="cards">
-  {% for novel in novels %}
-  <article><a href="/novel?url={{ novel.url | urlencode }}">{{ novel.title }}</a></article>
-  {% endfor %}
+<div class="page-head">
+  <div>
+    <h1>O que vamos ouvir hoje?</h1>
+    <p>Busque uma novel pelo nome ou cole o link dela.</p>
+  </div>
 </div>
-{% else %}
-<p class="muted">Nenhuma novel encontrada.</p>
-{% endif %}
+<form method="get" action="/" role="search" class="search">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.5 3a7.5 7.5 0 0 1 5.9 12.1l4.8 4.8-1.4 1.4-4.8-4.8A7.5 7.5 0 1 1 10.5 3Zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11Z"/></svg>
+  <input type="search" name="q" value="{{ query }}" placeholder="Shadow Slave, ou https://centralnovel.com/series/..." aria-label="Nome ou link da novel">
+  <button type="submit" class="btn">Buscar</button>
+</form>
 
 {% if jobs %}
-<h2>Últimos trabalhos</h2>
-{% include "_jobs_table.html" %}
+<section class="section">
+  <div class="section-head"><h2>Trabalhos recentes</h2><a class="muted small" href="/jobs">Ver todos</a></div>
+  {% include "_jobs_table.html" %}
+</section>
 {% endif %}
+
+<section class="section">
+  <h2>{{ "Resultados para “" ~ query ~ "”" if query else "Mais populares" }}</h2>
+  {% if error %}<div class="alert">{{ error }}</div>{% endif %}
+  {% if novels and not query %}
+  <div class="grid-novels">
+    {% for novel in novels %}
+    <a class="novel-card" href="/novel?url={{ novel.url | urlencode }}">
+      <div class="poster">
+        {% if novel.cover_url %}<img src="{{ novel.cover_url }}" alt="" loading="lazy">{% else %}<span>{{ novel.title[:1] }}</span>{% endif %}
+      </div>
+      <span class="title">{{ novel.title }}</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% elif novels %}
+  <div class="list-results">
+    {% for novel in novels %}
+    <a class="card" href="/novel?url={{ novel.url | urlencode }}"><strong>{{ novel.title }}</strong><span class="muted">→</span></a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="card empty">Nenhuma novel encontrada.</div>
+  {% endif %}
+</section>
 {% endblock %}

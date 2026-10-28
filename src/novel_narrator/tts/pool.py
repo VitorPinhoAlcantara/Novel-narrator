@@ -10,6 +10,10 @@ from novel_narrator.log import log
 from novel_narrator.tts import gpu
 
 
+class Interrupted(Exception):
+    pass
+
+
 class WorkerProcess:
     def __init__(self, index, command, log_dir):
         self.index = index
@@ -63,6 +67,10 @@ class WorkerProcess:
             self.proc.kill()
         self._log.close()
 
+    def kill(self):
+        self.dead = True
+        self.proc.kill()
+
 
 class TTSPool:
     def __init__(self, config, voice_paths, workers=None, log_dir=None):
@@ -74,6 +82,7 @@ class TTSPool:
         self.workers = []
         self.asr = None
         self.live_limit = self.n_workers
+        self.aborted = False
 
     def _python(self):
         return self.config["paths"]["tts_python"] or sys.executable
@@ -128,6 +137,8 @@ class TTSPool:
         texts = {}
         for item_id, wav in items:
             response = self.asr.send({"id": item_id, "wav": wav})
+            if self.aborted:
+                raise Interrupted()
             texts[item_id] = response.get("text", "") if response else ""
         return texts
 
@@ -138,6 +149,8 @@ class TTSPool:
                 self.workers.append(WorkerProcess(i, command, self.log_dir))
             for worker in self.workers:
                 worker.wait_ready()
+            if self.aborted:
+                raise Interrupted()
         except Exception:
             self.close()
             raise
@@ -169,6 +182,11 @@ class TTSPool:
         self.live_limit = self.n_workers
         return self.n_workers
 
+    def abort(self):
+        self.aborted = True
+        for worker in list(self.workers) + ([self.asr] if self.asr else []):
+            worker.kill()
+
     def close(self):
         for worker in self.workers:
             worker.close()
@@ -199,13 +217,15 @@ class TTSPool:
         def loop(worker):
             position = positions[id(worker)]
             while True:
-                while position >= self.live_limit and not pending.empty():
+                while position >= self.live_limit and not pending.empty() and not self.aborted:
                     time.sleep(2)
                 try:
                     job = pending.get_nowait()
                 except queue.Empty:
                     return
                 response = worker.send(job)
+                if self.aborted:
+                    return
                 died = response is None
                 if died and job.get("_deaths", 0) < 1:
                     job["_deaths"] = job.get("_deaths", 0) + 1
@@ -221,7 +241,7 @@ class TTSPool:
                 if died:
                     return
 
-        while not pending.empty() and self.workers:
+        while not pending.empty() and self.workers and not self.aborted:
             positions.update({id(w): i for i, w in enumerate(self.workers)})
             threads = [threading.Thread(target=loop, args=(w,), daemon=True) for w in self.workers]
             for t in threads:
@@ -230,6 +250,8 @@ class TTSPool:
                 t.join()
             self._prune_dead()
         stop.set()
+        if self.aborted:
+            raise Interrupted()
 
         while not pending.empty():
             job = pending.get_nowait()

@@ -1,11 +1,13 @@
 import copy
 import sys
+import threading
+import time
 from pathlib import Path
 
 import pytest
 
 from novel_narrator.config import DEFAULTS
-from novel_narrator.tts.pool import TTSPool
+from novel_narrator.tts.pool import Interrupted, TTSPool
 
 FAKE_WORKER = [sys.executable, "-u", str(Path(__file__).parent / "fake_worker.py")]
 
@@ -45,6 +47,17 @@ def test_job_requeued_after_a_crash_runs_on_a_live_worker(pool, tmp_path):
     results = pool.generate(jobs)
     assert results["0001"]["ok"] is True
     assert len(pool.workers) == 1
+
+
+def test_abort_kills_workers_and_stops_generate_without_results(pool):
+    pool.start()
+    done = []
+    threading.Timer(0.5, pool.abort).start()
+    start = time.time()
+    with pytest.raises(Interrupted):
+        pool.generate([{"id": f"{i:04d}", "text": "slow"} for i in range(4)], on_done=lambda *a: done.append(a))
+    assert time.time() - start < 10
+    assert done == []
 
 
 def test_command_points_to_emotion_dir_only_when_enabled(tmp_path):

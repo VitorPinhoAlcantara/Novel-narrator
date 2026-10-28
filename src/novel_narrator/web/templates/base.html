@@ -4,34 +4,44 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Novel Narrator{% endblock %}</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.0.6/css/pico.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600&display=swap">
   <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
-  <style>
-    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; }
-    .cards article { margin: 0; }
-    .volumes { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .5rem 1rem; }
-    .volumes small { display: block; margin-left: 2rem; line-height: 1.2; }
-    .cover { max-width: 160px; border-radius: .5rem; float: right; margin-left: 1rem; }
-    pre.log { max-height: 28rem; overflow: auto; font-size: .8rem; white-space: pre-wrap; }
-    .muted { color: var(--pico-muted-color); }
-    .ok { color: var(--pico-ins-color); }
-    .bad { color: var(--pico-del-color); }
-  </style>
+  <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
-  <header class="container">
-    <nav>
-      <ul><li><a href="/"><strong>Novel Narrator</strong></a></li></ul>
-      <ul>
-        <li><a href="/">Novels</a></li>
-        <li><a href="/epub">EPUB local</a></li>
-        <li><a href="/jobs">Trabalhos</a></li>
-        <li><a href="/settings">Configurações</a></li>
-      </ul>
-    </nav>
-  </header>
-  <main class="container">
-    {% block content %}{% endblock %}
-  </main>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v15H6.5a1.5 1.5 0 0 0 0 3H19v1H6.5A2.5 2.5 0 0 1 4 19.5v-14Zm11 2.7-4 2.3V6h-2v8h2v-1.5l4 2.3V8.2Z"/></svg>
+        </span>
+        <span>Novel Narrator</span>
+      </a>
+      <nav>
+        {% set here = request.url.path %}
+        <a href="/" class="{{ 'active' if here == '/' or here.startswith('/novel') }}">
+          <svg viewBox="0 0 24 24"><path d="M10.5 3a7.5 7.5 0 0 1 5.9 12.1l4.8 4.8-1.4 1.4-4.8-4.8A7.5 7.5 0 1 1 10.5 3Zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11Z"/></svg>
+          Novels
+        </a>
+        <a href="/epub" class="{{ 'active' if here.startswith('/epub') }}">
+          <svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm8 1.5V8h4.5L14 3.5ZM8 12v2h8v-2H8Zm0 4v2h6v-2H8Z"/></svg>
+          EPUB local
+        </a>
+        <a href="/jobs" class="{{ 'active' if here.startswith('/jobs') }}">
+          <svg viewBox="0 0 24 24"><path d="M4 5h16v2H4V5Zm0 6h16v2H4v-2Zm0 6h10v2H4v-2Z"/></svg>
+          Trabalhos
+          {% if running_count() %}<span class="pill">{{ running_count() }}</span>{% endif %}
+        </a>
+        <a href="/settings" class="{{ 'active' if here.startswith('/settings') }}">
+          <svg viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm8.9 2.6-2-.3a7 7 0 0 0-.7-1.6l1.2-1.7-1.4-1.4-1.7 1.2a7 7 0 0 0-1.6-.7l-.3-2h-2.8l-.3 2a7 7 0 0 0-1.6.7L6.2 5.6 4.8 7l1.2 1.7a7 7 0 0 0-.7 1.6l-2 .3v2.8l2 .3c.2.6.4 1.1.7 1.6L4.8 17l1.4 1.4 1.7-1.2c.5.3 1 .5 1.6.7l.3 2h2.8l.3-2c.6-.2 1.1-.4 1.6-.7l1.7 1.2 1.4-1.4-1.2-1.7c.3-.5.5-1 .7-1.6l2-.3v-2.8Z"/></svg>
+          Configurações
+        </a>
+      </nav>
+    </aside>
+    <main class="content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
 </body>
 </html>

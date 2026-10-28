@@ -3,6 +3,7 @@ import time
 
 from novel_narrator.models import Chapter
 from novel_narrator.pipeline.runner import run_chapters
+from novel_narrator.tts.pool import Interrupted
 
 LOOKAHEAD = 6
 
@@ -100,3 +101,34 @@ def test_without_audio_fetches_in_parallel():
         chapters(5), "Teste", {"cbz"}, fetch=lambda c: seen.append(c.number) or (True, None), delay_s=0
     )
     assert result["successes"] == 5 and sorted(seen) == [0, 1, 2, 3, 4]
+
+
+class InterruptedAudio(FakeAudio):
+    def generate_chapter(self, chapter):
+        if chapter.number == 2:
+            raise Interrupted()
+        return super().generate_chapter(chapter)
+
+
+def test_interrupted_audio_returns_the_rest_as_stopped():
+    events, fetched, lock = [], [], threading.Lock()
+    audio = InterruptedAudio(events, fetched, lock)
+    stop = threading.Event()
+    result = run_chapters(chapters(6), "Teste", {"audio"}, audio=audio, lookahead=LOOKAHEAD, delay_s=0, stop=stop)
+    assert result["successes"] == 2 and result["failures"] == []
+    assert [c.number for c in result["stopped"]] == [2, 3, 4, 5]
+    assert audio.closed
+
+
+def test_stop_event_halts_downloads():
+    stop = threading.Event()
+    seen = []
+
+    def fetch(chapter):
+        seen.append(chapter.number)
+        if chapter.number == 1:
+            stop.set()
+        return True, None
+
+    result = run_chapters(chapters(10), "Teste", {"cbz"}, fetch=fetch, parallel=1, delay_s=0.01, stop=stop)
+    assert len(result["stopped"]) >= 7 and result["successes"] + len(result["stopped"]) == 10

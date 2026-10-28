@@ -43,12 +43,18 @@ class ManualQueue(JobQueue):
         self.jobs = {}
         self.submitted = []
         self._ids = iter(range(1, 100))
+        self._pending = Pending()
 
     def submit(self, title, chapters, outputs, task):
         job = Job(next(self._ids), title, list(chapters), set(outputs), task, total=len(chapters))
         self.jobs[job.id] = job
         self.submitted.append(job)
         return job
+
+
+class Pending(list):
+    def put(self, job):
+        self.append(job)
 
 
 @pytest.fixture
@@ -78,7 +84,7 @@ def test_search(client):
 
 def test_novel_page_groups_volumes_and_checks_default_outputs(client):
     page = client.get("/novel", params={"url": URL}).text
-    assert "caps 1–2 (2)" in page and "Vol. Extra" in page
+    assert "caps 1–2 · 2" in page and "Vol. Extra" in page
     assert 'value="audio" checked' in page and 'value="cbz" checked' in page and 'value="pdf" >' in page
 
 
@@ -108,7 +114,7 @@ def test_job_status_polls_only_while_active(client, queue):
     assert 'hx-trigger="every 2s"' in client.get(f"/jobs/{job.id}/status").text
     job.status, job.done = "done", 2
     status = client.get(f"/jobs/{job.id}/status").text
-    assert "hx-trigger" not in status and "concluido" in status
+    assert "hx-trigger" not in status and "concluído" in status
 
 
 def test_retry_runs_only_failed_chapters(client, queue):
@@ -156,3 +162,51 @@ def test_queue_marks_crashed_task_as_failed():
     assert job.status == "failed" and job.error == "boom"
     log("depois", "nao deve entrar")
     assert job.lines == []
+
+
+def test_pause_stops_running_job_and_resume_requeues_the_rest(client, queue):
+    calls = []
+    job = queue.submit("N", CHAPTERS[:3], {"audio"}, None)
+    job.status = "running"
+    job.on_stop.append(lambda: calls.append("abort"))
+    client.post(f"/jobs/{job.id}/pause")
+    assert job.stop.is_set() and calls == ["abort"] and job.status == "stopping"
+
+    def task(running):
+        running.progress(1, 3)
+        return {"failures": [], "stopped": CHAPTERS[1:3]}
+
+    job.task = task
+    job.status = "queued"
+    queue.run(job)
+    assert job.status == "paused" and job.remaining == CHAPTERS[1:3]
+    client.post(f"/jobs/{job.id}/resume")
+    assert job.status == "queued" and job.chapters == CHAPTERS[1:3] and queue._pending == [job]
+    assert not job.stop.is_set()
+    job.task = lambda running: (running.progress(2, 2), {"failures": [], "stopped": []})[1]
+    queue.run(job)
+    assert job.status == "done" and (job.done, job.total) == (3, 3)
+
+
+def test_pausing_a_queued_job_keeps_all_chapters(client, queue):
+    job = queue.submit("N", CHAPTERS[:2], {"cbz"}, None)
+    client.post(f"/jobs/{job.id}/pause")
+    assert job.status == "paused" and job.remaining == CHAPTERS[:2]
+
+
+def test_search_with_a_novel_link_opens_the_novel(client):
+    response = client.get("/", params={"q": URL}, follow_redirects=False)
+    assert response.status_code == 303 and response.headers["location"].startswith("/novel?url=https%3A")
+
+
+def test_log_stops_polling_when_job_ends(client, queue):
+    job = queue.submit("N", CHAPTERS[:1], {"cbz"}, None)
+    job.lines = ["[Cap 1 OK] pronto"]
+    assert client.get(f"/jobs/{job.id}/log").status_code == 200
+    job.status = "done"
+    response = client.get(f"/jobs/{job.id}/log")
+    assert response.status_code == 286 and "[Cap 1 OK] pronto" in response.text
+
+
+def test_static_css_is_served(client):
+    assert client.get("/static/app.css").status_code == 200

@@ -1,21 +1,49 @@
-<section id="status" {% if job.active %}hx-get="/jobs/{{ job.id }}/status" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
-  <p>
-    <strong>{{ status_names[job.status] }}</strong>
-    · {{ job.done }}/{{ job.total }} capítulos
-  </p>
-  <progress value="{{ job.done }}" max="{{ job.total or 1 }}" aria-label="Progresso"></progress>
-  {% if job.error %}<p class="bad">Erro: {{ job.error }}</p>{% endif %}
+<section id="status" class="card" {% if job.active %}hx-get="/jobs/{{ job.id }}/status" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
+  <div class="job-head">
+    <span class="badge {{ job.status }}">{{ status_names[job.status] }}</span>
+    <div class="job-actions">
+      {% if job.status in ("queued", "running") %}
+      <form method="post" action="/jobs/{{ job.id }}/pause">
+        <button type="submit" class="btn ghost small">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7V5Zm6 0h4v14h-4V5Z"/></svg>
+          Pausar
+        </button>
+      </form>
+      {% elif job.status == "paused" and job.remaining %}
+      <form method="post" action="/jobs/{{ job.id }}/resume">
+        <button type="submit" class="btn small">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7L8 5Z"/></svg>
+          Retomar ({{ job.remaining | length }})
+        </button>
+      </form>
+      {% endif %}
+      {% if job.failures and not job.active %}
+      <form method="post" action="/jobs/{{ job.id }}/retry">
+        <button type="submit" class="btn ghost small">Tentar de novo os que falharam</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  {% if job.status == "stopping" %}
+  <p class="muted small">{% if "audio" in job.outputs %}Encerrando o XTTS e terminando os downloads em andamento.{% else %}Terminando os downloads em andamento.{% endif %}</p>
+  {% elif job.status == "paused" %}
+  <p class="muted small">Pausado.{% if "audio" in job.outputs %} A GPU está livre; ao retomar, o capítulo interrompido continua do trecho em que parou.{% endif %}</p>
+  {% endif %}
+  <div class="stats">
+    <div class="stat"><div class="label">Capítulos</div><div class="value">{{ job.done }}<span class="muted small"> / {{ job.total }}</span></div></div>
+    <div class="stat"><div class="label">Progresso</div><div class="value">{{ job.percent }}%</div></div>
+    <div class="stat"><div class="label">Com erro</div><div class="value">{{ job.failures | length }}</div></div>
+  </div>
+  <div class="bar big-bar {{ 'done' if job.status == 'done' }}" role="progressbar" aria-valuenow="{{ job.percent }}" aria-valuemin="0" aria-valuemax="100"><span style="width: {{ job.percent }}%"></span></div>
+  {% if job.error %}<div class="alert section">Erro: {{ job.error }}</div>{% endif %}
   {% if job.failures %}
-  <h3>Capítulos com erro</h3>
-  <ul>
-    {% for failure in job.failures %}
-    <li>Vol. {{ failure.chapter.volume }} · Cap. {{ failure.chapter.number }} · {{ failure.chapter.title }} — <span class="bad">{{ failure.reason }}</span></li>
-    {% endfor %}
-  </ul>
-  {% if not job.active %}
-  <form method="post" action="/jobs/{{ job.id }}/retry"><button type="submit">Tentar de novo os que falharam</button></form>
+  <div class="section">
+    <h3>Capítulos com erro</h3>
+    <ul class="failures section">
+      {% for failure in job.failures %}
+      <li>Vol. {{ failure.chapter.volume }} · Cap. {{ failure.chapter.number }} · {{ failure.chapter.title }}<div class="reason">{{ failure.reason }}</div></li>
+      {% endfor %}
+    </ul>
+  </div>
   {% endif %}
-  {% endif %}
-  <pre class="log">{% for line in job.lines %}{{ line }}
-{% else %}{{ "Aguardando o início..." if job.status == "queued" else "" }}{% endfor %}</pre>
 </section>

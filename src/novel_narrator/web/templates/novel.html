@@ -1,41 +1,51 @@
 {% extends "base.html" %}
 {% block title %}{{ novel.title }} · Novel Narrator{% endblock %}
 {% block content %}
-<article>
-  {% if novel.cover_url %}<img class="cover" src="{{ novel.cover_url }}" alt="Capa de {{ novel.title }}">{% endif %}
-  <hgroup>
+<div class="novel-hero">
+  <div class="poster">{% if novel.cover_url %}<img src="{{ novel.cover_url }}" alt="Capa de {{ novel.title }}">{% endif %}</div>
+  <div>
     <h1>{{ novel.title }}</h1>
-    <p>{{ novel.author or "Autor não informado" }} · {{ chapters | length }} capítulos · {{ volumes | length }} volumes</p>
-  </hgroup>
+    <p class="muted">{{ novel.author or "Autor não informado" }}</p>
+    <div class="chips">
+      <span class="chip">{{ chapters | length }} capítulos</span>
+      <span class="chip">{{ volumes | length }} volumes</span>
+    </div>
+  </div>
+</div>
 
-  <form method="post" action="/novel/run">
-    <input type="hidden" name="url" value="{{ novel.url }}">
-    <fieldset>
-      <legend>Volumes completos</legend>
-      <div class="volumes">
-        {% for volume in volumes %}
-        <div>
-          <label><input type="checkbox" name="volumes" value="{{ volume.name }}"> Vol. {{ volume.name }}</label>
-          <small class="muted">caps {{ volume.first }}–{{ volume.last }} ({{ volume.count }})</small>
-        </div>
-        {% endfor %}
-      </div>
-    </fieldset>
-    <label>
-      Capítulos específicos
-      <input type="text" name="numbers" placeholder="ex.: 1,2,10-15">
-    </label>
-    <fieldset>
-      <legend>O que gerar</legend>
-      {% for value in ("cbz", "pdf", "audio") %}
-      <label>
-        <input type="checkbox" name="outputs" value="{{ value }}" {% if value in defaults %}checked{% endif %}>
-        {{ output_names[value] }}
+<form method="post" action="/novel/run" class="form-stack">
+  <input type="hidden" name="url" value="{{ novel.url }}">
+  <div class="card form-block">
+    <h2>Volumes</h2>
+    <p class="hint">Marque os volumes inteiros que quer processar.</p>
+    <div class="volume-grid">
+      {% for volume in volumes %}
+      <label class="tile">
+        <input type="checkbox" name="volumes" value="{{ volume.name }}">
+        <span><strong>Vol. {{ volume.name }}</strong><small>caps {{ volume.first }}–{{ volume.last }} · {{ volume.count }}</small></span>
       </label>
       {% endfor %}
-      <label><input type="checkbox" name="overwrite" role="switch"> Reescrever o que já existe</label>
-    </fieldset>
-    <button type="submit">Começar</button>
-  </form>
-</article>
+    </div>
+  </div>
+
+  <div class="card form-block">
+    <h2>Capítulos avulsos</h2>
+    <p class="hint">Opcional. Somados aos volumes marcados.</p>
+    <input type="text" name="numbers" placeholder="ex.: 1,2,10-15" aria-label="Capítulos avulsos">
+  </div>
+
+  <div class="card form-block">
+    <h2>O que gerar</h2>
+    <div class="toggle-row">
+      {% for value in ("audio", "cbz", "pdf") %}
+      <label class="toggle"><input type="checkbox" name="outputs" value="{{ value }}" {% if value in defaults %}checked{% endif %}><span>{{ output_names[value] }}</span></label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="action-bar">
+    <label class="toggle"><input type="checkbox" name="overwrite"><span>Reescrever o que já existe</span></label>
+    <button type="submit" class="btn">Começar</button>
+  </div>
+</form>
 {% endblock %}

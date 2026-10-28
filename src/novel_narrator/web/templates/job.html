@@ -1,9 +1,27 @@
 {% extends "base.html" %}
 {% block title %}Trabalho {{ job.id }} · Novel Narrator{% endblock %}
 {% block content %}
-<hgroup>
-  <h1>{{ job.title }}</h1>
-  <p>Trabalho #{{ job.id }} · {{ describe_outputs(job.outputs) }} · {{ job.total }} capítulo(s)</p>
-</hgroup>
+<div class="page-head">
+  <div>
+    <h1>{{ job.title }}</h1>
+    <p>Trabalho #{{ job.id }} · {{ describe_outputs(job.outputs) }}</p>
+  </div>
+</div>
 {% include "_job_status.html" %}
+<section class="section">
+  <h2>Registro</h2>
+  <pre class="log" id="log" {% if job.active %}hx-get="/jobs/{{ job.id }}/log" hx-trigger="every 2s" hx-swap="innerHTML"{% endif %}>{% include "_job_log.html" %}</pre>
+</section>
+<script>
+  document.addEventListener("htmx:beforeSwap", (event) => {
+    const log = event.detail.target;
+    if (log.id === "log") log.dataset.follow = log.scrollHeight - log.scrollTop - log.clientHeight < 40 ? "1" : "";
+  });
+  document.addEventListener("htmx:afterSwap", (event) => {
+    const log = event.detail.target;
+    if (log.id === "log" && log.dataset.follow) log.scrollTop = log.scrollHeight;
+  });
+  const log = document.getElementById("log");
+  log.scrollTop = log.scrollHeight;
+</script>
 {% endblock %}

@@ -1,45 +1,55 @@
 {% extends "base.html" %}
 {% block title %}EPUB local · Novel Narrator{% endblock %}
 {% block content %}
-<h1>EPUB local</h1>
-<form method="get" action="/epub" role="search">
-  <input type="text" name="path" value="{{ path }}" placeholder="Caminho do arquivo .epub" aria-label="Caminho do EPUB" required>
-  <button type="submit">Abrir</button>
+<div class="page-head"><div><h1>EPUB local</h1><p>Transforme um livro do seu computador em audiolivro.</p></div></div>
+<form method="get" action="/epub" class="search">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm8 1.5V8h4.5L14 3.5Z"/></svg>
+  <input type="text" name="path" value="{{ path }}" placeholder="C:\Livros\meu-livro.epub" aria-label="Caminho do EPUB" required>
+  <button type="submit" class="btn">Abrir</button>
 </form>
-{% if error %}<p class="bad">{{ error }}</p>{% endif %}
+{% if error %}<div class="alert section">{{ error }}</div>{% endif %}
 
 {% if book %}
 {% set novel = book.novel() %}
 {% set chapters = book.chapters() %}
-<article>
-  <hgroup>
-    <h2>{{ novel.title }}</h2>
-    <p>{{ novel.author or "Autor não informado" }} · {{ chapters | length }} capítulos com texto · capa: {{ "sim" if book.cover() else "não" }}</p>
-  </hgroup>
-  <p class="muted">Já vem marcado o que parece ser conteúdo; sumário, índice, notas e páginas curtas ficam desmarcados.</p>
-  <form method="post" action="/epub/run">
-    <input type="hidden" name="path" value="{{ book.path }}">
-    <fieldset>
+<form method="post" action="/epub/run" class="form-stack section">
+  <input type="hidden" name="path" value="{{ book.path }}">
+  <div>
+    <h1>{{ novel.title }}</h1>
+    <div class="chips">
+      <span class="chip">{{ novel.author or "Autor não informado" }}</span>
+      <span class="chip">{{ chapters | length }} capítulos com texto</span>
+      <span class="chip">capa: {{ "sim" if book.cover() else "não" }}</span>
+    </div>
+  </div>
+  <div class="card form-block">
+    <h2>Capítulos</h2>
+    <p class="hint">Já vem marcado o que parece ser conteúdo; sumário, índice, notas e páginas curtas ficam desmarcados.</p>
+    <div class="chapter-list">
       {% for chapter in chapters %}
-      <label>
+      <label class="check">
         <input type="checkbox" name="chapters" value="{{ chapter.number }}" {% if chapter.suggested %}checked{% endif %}>
-        {{ chapter.number }}. {{ chapter.title[:80] }} <small class="muted">~{{ format_duration(estimate([chapter])) }}</small>
+        <span>{{ chapter.number }}. {{ chapter.title[:80] }}</span>
+        <small>~{{ format_duration(estimate([chapter])) }}</small>
       </label>
       {% endfor %}
-    </fieldset>
-    {% if libraries %}
-    <label>
-      Biblioteca do Audiobookshelf
+    </div>
+  </div>
+  {% if libraries %}
+  <div class="card form-block">
+    <label class="field">Biblioteca do Audiobookshelf
       <select name="library">
         {% for library in libraries %}
         <option value="{{ library.name }}" {% if library.name == default_library %}selected{% endif %}>{{ library.name }}</option>
         {% endfor %}
       </select>
     </label>
-    {% endif %}
-    <label><input type="checkbox" name="overwrite" role="switch"> Reescrever áudios que já existem</label>
-    <button type="submit">Gerar audiolivro</button>
-  </form>
-</article>
+  </div>
+  {% endif %}
+  <div class="action-bar">
+    <label class="toggle"><input type="checkbox" name="overwrite"><span>Reescrever áudios que já existem</span></label>
+    <button type="submit" class="btn">Gerar audiolivro</button>
+  </div>
+</form>
 {% endif %}
 {% endblock %}

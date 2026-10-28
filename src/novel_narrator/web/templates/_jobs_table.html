@@ -1,14 +1,12 @@
-<table>
-  <thead><tr><th>#</th><th>Novel</th><th>Saídas</th><th>Capítulos</th><th>Situação</th></tr></thead>
-  <tbody>
-    {% for job in jobs %}
-    <tr>
-      <td><a href="/jobs/{{ job.id }}">{{ job.id }}</a></td>
-      <td>{{ job.title }}</td>
-      <td>{{ describe_outputs(job.outputs) }}</td>
-      <td>{{ job.done }}/{{ job.total }}</td>
-      <td>{{ status_names[job.status] }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="job-list">
+  {% for job in jobs %}
+  <a class="card job-row" href="/jobs/{{ job.id }}">
+    <div>
+      <strong>{{ job.title }}</strong>
+      <div class="meta">#{{ job.id }} · {{ describe_outputs(job.outputs) }} · {{ job.done }}/{{ job.total }} capítulos</div>
+    </div>
+    <span class="badge {{ job.status }}">{{ status_names[job.status] }}</span>
+    <div class="bar {{ 'done' if job.status == 'done' }}"><span style="width: {{ job.percent }}%"></span></div>
+  </a>
+  {% endfor %}
+</div>

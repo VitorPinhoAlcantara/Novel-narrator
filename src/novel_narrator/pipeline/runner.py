@@ -4,6 +4,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 from novel_narrator.log import chapter_label, chapter_tag, format_duration, log
+from novel_narrator.tts.pool import Interrupted
 
 OUTPUT_NAMES = {"pdf": "PDF", "cbz": "CBZ", "audio": "Audiolivro"}
 
@@ -23,22 +24,26 @@ def run_chapters(
     lookahead=6,
     delay_s=0.3,
     on_done=None,
+    stop=None,
 ):
     if not chapters:
         print("Nenhum capitulo selecionado")
-        return {"successes": 0, "failures": []}
+        return {"successes": 0, "failures": [], "stopped": []}
     if "audio" in outputs and audio is None:
         raise ValueError("a saida 'audio' exige uma sessao de audiolivro")
     fetch = fetch or (lambda chapter: (True, None))
+    stop = stop or threading.Event()
     total = len(chapters)
     _print_header(novel_title, total, outputs, overwrite, parallel, lookahead)
 
     lock = threading.Lock()
     counters = {"ok": 0, "done": 0}
     failures = []
+    recorded = set()
 
     def record(index, chapter, ok, reason, extra=""):
         with lock:
+            recorded.add(index)
             counters["done"] += 1
             if ok:
                 counters["ok"] += 1
@@ -54,15 +59,18 @@ def run_chapters(
             on_done(done, total)
 
     def fetch_and_record(index, chapter):
-        record(index, chapter, *_safe(fetch, chapter))
+        if not stop.is_set():
+            record(index, chapter, *_safe(fetch, chapter))
 
     try:
         if "audio" in outputs:
-            _run_with_audio(chapters, fetch, audio, overwrite, lookahead, delay_s, record)
+            _run_with_audio(chapters, fetch, audio, overwrite, lookahead, delay_s, record, stop)
         else:
             with ThreadPoolExecutor(max_workers=parallel) as executor:
                 futures = []
                 for index, chapter in enumerate(chapters):
+                    if stop.is_set():
+                        break
                     futures.append(executor.submit(fetch_and_record, index, chapter))
                     time.sleep(delay_s)
                 for future in futures:
@@ -72,19 +80,27 @@ def run_chapters(
             audio.close()
 
     failures.sort(key=lambda item: item[0])
-    print(f"\n{'=' * 50}\nSucessos: {counters['ok']}\nFalhas: {len(failures)}\n{'=' * 50}")
-    return {"successes": counters["ok"], "failures": [{"chapter": c, "reason": r} for _, c, r in failures]}
+    stopped = [c for i, c in enumerate(chapters) if i not in recorded]
+    summary = f"Sucessos: {counters['ok']}\nFalhas: {len(failures)}"
+    if stopped:
+        summary += f"\nInterrompidos: {len(stopped)}"
+    print(f"\n{'=' * 50}\n{summary}\n{'=' * 50}")
+    return {
+        "successes": counters["ok"],
+        "failures": [{"chapter": c, "reason": r} for _, c, r in failures],
+        "stopped": stopped,
+    }
 
 
-def _run_with_audio(chapters, fetch, audio, overwrite, lookahead, delay_s, record):
+def _run_with_audio(chapters, fetch, audio, overwrite, lookahead, delay_s, record, stop):
     ready = queue.Queue()
     slots = threading.Semaphore(lookahead)
-    stop = threading.Event()
+    done = threading.Event()
 
     def producer():
         for index, chapter in enumerate(chapters):
             slots.acquire()
-            if stop.is_set():
+            if done.is_set() or stop.is_set():
                 break
             ready.put((index, chapter, *_safe(fetch, chapter)))
             time.sleep(delay_s)
@@ -95,7 +111,7 @@ def _run_with_audio(chapters, fetch, audio, overwrite, lookahead, delay_s, recor
     try:
         while True:
             item = ready.get()
-            if item is None:
+            if item is None or stop.is_set():
                 break
             index, chapter, ok, reason = item
             extra = ""
@@ -115,12 +131,14 @@ def _run_with_audio(chapters, fetch, audio, overwrite, lookahead, delay_s, recor
                             extra = f" | faltam {remaining} audio(s), previsao ~{format_duration(remaining * average)}"
                 elif ok:
                     log(chapter_tag(chapter, "audio"), "ja existe no servidor, pulando")
+            except Interrupted:
+                break
             except Exception as exc:
                 ok, reason = False, f"Erro inesperado: {exc}"
             slots.release()
             record(index, chapter, ok, reason, extra)
     finally:
-        stop.set()
+        done.set()
         slots.release()
 
 

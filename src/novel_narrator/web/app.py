@@ -1,8 +1,10 @@
 from pathlib import Path
+from urllib.parse import quote
 
 import requests
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from novel_narrator.cli.menus import list_volumes, parse_numbers
@@ -17,7 +19,14 @@ from novel_narrator.sources.centralnovel import CentralNovel
 from novel_narrator.sources.epub import EpubSource, estimated_duration_s
 from novel_narrator.web.jobs import JobQueue
 
-STATUS_NAMES = {"queued": "na fila", "running": "rodando", "done": "concluido", "failed": "com falhas"}
+STATUS_NAMES = {
+    "queued": "na fila",
+    "running": "rodando",
+    "stopping": "pausando",
+    "paused": "pausado",
+    "done": "concluído",
+    "failed": "com falhas",
+}
 
 
 def create_app(config=None, source=None, jobs=None):
@@ -31,8 +40,10 @@ def create_app(config=None, source=None, jobs=None):
         status_names=STATUS_NAMES,
         describe_outputs=describe_outputs,
         format_duration=format_duration,
+        running_count=lambda: sum(1 for j in jobs.jobs.values() if j.active),
     )
     app = FastAPI(title="Novel Narrator")
+    app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
     def page(request, name, **context):
         return templates.TemplateResponse(request, name, context)
@@ -53,6 +64,8 @@ def create_app(config=None, source=None, jobs=None):
             audio = (
                 AudiobookSession(task_source, novel, run_config, book_mode=book_mode) if "audio" in outputs else None
             )
+            if audio is not None:
+                job.on_stop.append(audio.abort)
             return run_chapters(
                 job.chapters,
                 novel.title,
@@ -63,12 +76,16 @@ def create_app(config=None, source=None, jobs=None):
                 parallel=download["parallel"],
                 lookahead=download["lookahead_chapters"],
                 on_done=job.progress,
+                stop=job.stop,
             )
 
         return run
 
     @app.get("/", response_class=HTMLResponse)
     def index(request: Request, q: str = ""):
+        link = source.parse_url(q.strip()) if q.strip() else None
+        if link:
+            return RedirectResponse(f"/novel?url={quote(link, safe='')}", status_code=303)
         error = ""
         try:
             novels_found = source.search(q, limit=20) if q.strip() else source.popular(limit=12)
@@ -169,12 +186,29 @@ def create_app(config=None, source=None, jobs=None):
     def job_status(request: Request, job_id: int):
         return page(request, "_job_status.html", job=find_job(job_id))
 
+    @app.get("/jobs/{job_id}/log", response_class=HTMLResponse)
+    def job_log(request: Request, job_id: int):
+        job = find_job(job_id)
+        return templates.TemplateResponse(
+            request, "_job_log.html", {"job": job}, status_code=200 if job.active else 286
+        )
+
     @app.post("/jobs/{job_id}/retry")
     def job_retry(job_id: int):
         job = find_job(job_id)
         if job.active or not job.failures:
             raise HTTPException(400, "Nada para tentar de novo")
         return RedirectResponse(f"/jobs/{jobs.retry(job).id}", status_code=303)
+
+    @app.post("/jobs/{job_id}/pause")
+    def job_pause(job_id: int):
+        jobs.pause(find_job(job_id))
+        return RedirectResponse(f"/jobs/{job_id}", status_code=303)
+
+    @app.post("/jobs/{job_id}/resume")
+    def job_resume(job_id: int):
+        jobs.resume(find_job(job_id))
+        return RedirectResponse(f"/jobs/{job_id}", status_code=303)
 
     @app.get("/settings", response_class=HTMLResponse)
     def settings_page(request: Request, test: bool = False):

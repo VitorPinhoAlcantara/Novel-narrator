@@ -125,7 +125,9 @@ def parse_popular(html):
         if not _is_novel_url(url):
             continue
         title = anchor.get("title", "").strip() or " ".join(article.get_text(" ", strip=True).split())
-        novels.append(Novel(title=title or _title_from_url(url), url=_clean_url(url)))
+        image = article.select_one("img")
+        cover = (image.get("src") or image.get("data-src") or "").strip() if image else ""
+        novels.append(Novel(title=title or _title_from_url(url), url=_clean_url(url), cover_url=cover))
     return _dedupe(novels)
 
 

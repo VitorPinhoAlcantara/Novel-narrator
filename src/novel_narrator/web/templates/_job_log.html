@@ -1,0 +1,2 @@
+{% for line in job.lines %}{{ line }}
+{% else %}{{ "Aguardando o início..." if job.status == "queued" else "" }}{% endfor %}
