@@ -1,6 +1,17 @@
 import threading
 
-from novel_narrator.log import format_duration, log
+from novel_narrator.log import chapter_tag, format_duration, log, summarize_chapters
+from novel_narrator.models import Chapter
+
+
+def test_chapter_tag():
+    assert chapter_tag(Chapter(147, "Poder", volume="2"), "audio") == "Cap 147 audio"
+    assert chapter_tag(Chapter(7, "x")) == "Cap 7"
+
+
+def test_summary_of_chapters():
+    assert summarize_chapters([Chapter(n, "x", volume="") for n in (1, 2, 3, 7)]) == "Caps 1-3, 7"
+    assert summarize_chapters([Chapter(5, "x", volume="2")]) == "Vol 2: 5"
 
 
 def test_format_duration():

@@ -8,6 +8,37 @@ def log(tag, message):
         print(f"[{tag}] {message}", flush=True)
 
 
+def chapter_tag(chapter, stage=""):
+    return f"Cap {chapter.number} {stage}".strip()
+
+
+def chapter_label(chapter):
+    volume = str(chapter.volume).strip()
+    return f"Vol. {volume} - {chapter.title}" if volume else chapter.title
+
+
+def summarize_chapters(chapters):
+    by_volume = {}
+    for chapter in chapters:
+        by_volume.setdefault(str(chapter.volume), set()).add(chapter.number)
+    return " | ".join(
+        f"Vol {volume}: {_ranges(sorted(numbers))}" if volume.strip() else f"Caps {_ranges(sorted(numbers))}"
+        for volume, numbers in by_volume.items()
+    )
+
+
+def _ranges(numbers):
+    ranges = []
+    start = previous = numbers[0]
+    for number in numbers[1:] + [None]:
+        if number is not None and number == previous + 1:
+            previous = number
+            continue
+        ranges.append(str(start) if start == previous else f"{start}-{previous}")
+        start = previous = number
+    return ", ".join(ranges)
+
+
 def format_duration(seconds):
     seconds = max(0, int(round(seconds)))
     hours, rest = divmod(seconds, 3600)
