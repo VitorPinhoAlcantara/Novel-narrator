@@ -14,7 +14,11 @@ dependencies = [
     "pymupdf>=1.28",
     "requests>=2.33",
     "soundfile>=0.14",
+    "tomli-w>=1.2",
 ]
+
+[project.scripts]
+novel-narrator = "novel_narrator.cli.__main__:main"
 
 [project.optional-dependencies]
 tts = [

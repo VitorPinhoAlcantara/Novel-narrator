@@ -93,13 +93,13 @@ class AudiobookSession:
         self._tag = "audio"
 
     def pending(self, chapter, overwrite=False):
-        self._prepare()
+        self.prepare()
         if self._prepare_error or overwrite:
             return True
         return self._relative(chapter) not in self.existing
 
     def generate_chapter(self, chapter):
-        self._prepare()
+        self.prepare()
         if self._prepare_error:
             return False, self._prepare_error
         try:
@@ -182,15 +182,15 @@ class AudiobookSession:
     def _log(self, message):
         log(self._tag, message)
 
-    def _prepare(self):
+    def prepare(self):
         if self._prepared:
-            return
+            return self._prepare_error
         self._prepared = True
         error = self._validate_environment()
         if error:
             self._prepare_error = error
             log("Preparo", f"ERRO: {error}")
-            return
+            return error
         log("Preparo", f"autor: {self.author}")
         try:
             self._discard_incomplete_outbox()
@@ -203,6 +203,7 @@ class AudiobookSession:
         except RuntimeError as exc:
             self._prepare_error = f"servidor do Audiobookshelf indisponivel: {exc}"
             log("Preparo", f"ERRO: {self._prepare_error}")
+        return self._prepare_error
 
     def _validate_environment(self):
         paths = self.config["paths"]

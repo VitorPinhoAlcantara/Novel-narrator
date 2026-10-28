@@ -3,6 +3,8 @@ import os
 import tomllib
 from pathlib import Path
 
+import tomli_w
+
 from novel_narrator.text.normalize import DEFAULT_OPTIONS
 
 DEFAULTS = {
@@ -76,6 +78,26 @@ def load_config(path="config.toml", env_path=".env"):
     if token:
         config["abs"]["token"] = token
     return config
+
+
+def save_config(changes, path="config.toml"):
+    path = Path(path)
+    data = {}
+    if path.exists():
+        with path.open("rb") as file:
+            data = tomllib.load(file)
+    _merge(data, changes, "")
+    partial = path.with_name(path.name + ".tmp")
+    with partial.open("wb") as file:
+        tomli_w.dump(data, file)
+    os.replace(partial, path)
+
+
+def save_env(key, value, path=".env"):
+    path = Path(path)
+    lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+    kept = [line for line in lines if line.split("=", 1)[0].strip() != key]
+    path.write_text("\n".join([*kept, f"{key}={value}"]) + "\n", encoding="utf-8")
 
 
 def _merge(base, new, prefix):
