@@ -6,13 +6,29 @@
     <h1>{{ job.title }}</h1>
     <p>Trabalho #{{ job.id }} · {{ describe_outputs(job.outputs) }}</p>
   </div>
+  <div class="view-tabs" role="group" aria-label="Visualização">
+    <button type="button" data-view="now" aria-pressed="true">Agora</button>
+    <button type="button" data-view="map" aria-pressed="false">Mapa</button>
+  </div>
 </div>
-{% include "_job_status.html" %}
-<section class="section">
-  <h2>Registro</h2>
+<div id="views" data-view="now">
+  {% include "_job_status.html" %}
+</div>
+<details class="section tech">
+  <summary>Registro técnico</summary>
   <pre class="log" id="log" {% if job.active %}hx-get="/jobs/{{ job.id }}/log" hx-trigger="every 2s" hx-swap="innerHTML"{% endif %}>{% include "_job_log.html" %}</pre>
-</section>
+</details>
 <script>
+  const views = document.getElementById("views");
+  const buttons = document.querySelectorAll(".view-tabs button");
+  function show(view) {
+    views.dataset.view = view;
+    buttons.forEach((b) => b.setAttribute("aria-pressed", b.dataset.view === view));
+    try { localStorage.setItem("job-view", view); } catch (e) {}
+  }
+  buttons.forEach((b) => b.addEventListener("click", () => show(b.dataset.view)));
+  try { show(localStorage.getItem("job-view") || "now"); } catch (e) {}
+
   document.addEventListener("htmx:beforeSwap", (event) => {
     const log = event.detail.target;
     if (log.id === "log") log.dataset.follow = log.scrollHeight - log.scrollTop - log.clientHeight < 40 ? "1" : "";
@@ -22,6 +38,6 @@
     if (log.id === "log" && log.dataset.follow) log.scrollTop = log.scrollHeight;
   });
   const log = document.getElementById("log");
-  log.scrollTop = log.scrollHeight;
+  document.querySelector("details.tech").addEventListener("toggle", () => { log.scrollTop = log.scrollHeight; });
 </script>
 {% endblock %}

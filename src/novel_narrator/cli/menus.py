@@ -6,9 +6,10 @@ from datetime import datetime
 import requests
 from InquirerPy import inquirer
 
+from novel_narrator.cli.panel import Panel
 from novel_narrator.config import load_config, save_config, save_env
 from novel_narrator.log import format_duration, summarize_chapters
-from novel_narrator.outputs.files import fetch_chapter_files, file_name, split_downloaded
+from novel_narrator.outputs.files import fetch_chapter_files, file_name, needs_files, split_downloaded
 from novel_narrator.pipeline.audiobook import AudiobookSession
 from novel_narrator.pipeline.runner import describe_outputs, run_chapters
 from novel_narrator.publish import abs_api, abs_server
@@ -109,17 +110,19 @@ def process_novel(source, novel, chapters, config):
 
         def run(chapters_to_run, outputs=outputs, overwrite=overwrite, new_session=new_session):
             download = config["download"]
-            return run_chapters(
-                chapters_to_run,
-                novel.title,
-                outputs,
-                fetch=lambda chapter: fetch_chapter_files(source, config, novel.title, chapter, outputs, overwrite),
-                audio=new_session() if new_session else None,
-                overwrite=overwrite,
-                parallel=download["parallel"],
-                lookahead=download["lookahead_chapters"],
-                delay_s=0.3,
-            )
+            with Panel():
+                return run_chapters(
+                    chapters_to_run,
+                    novel.title,
+                    outputs,
+                    fetch=lambda chapter: fetch_chapter_files(source, config, novel.title, chapter, outputs, overwrite),
+                    audio=new_session() if new_session else None,
+                    overwrite=overwrite,
+                    parallel=download["parallel"],
+                    lookahead=download["lookahead_chapters"],
+                    delay_s=0.3,
+                    needs_download=lambda chapter: needs_files(config, novel.title, chapter, outputs, overwrite),
+                )
 
         handle_failures(config, novel.title, run(selected)["failures"], run)
 
@@ -201,7 +204,8 @@ def epub_menu():
     new_session = session_factory(probe, lambda: AudiobookSession(source, novel, run_config, book_mode=True))
 
     def run(chapters_to_run):
-        return run_chapters(chapters_to_run, novel.title, {"audio"}, audio=new_session(), overwrite=overwrite)
+        with Panel():
+            return run_chapters(chapters_to_run, novel.title, {"audio"}, audio=new_session(), overwrite=overwrite)
 
     handle_failures(run_config, novel.title, run(chosen)["failures"], run)
     inquirer.confirm(message="Voltar ao menu principal", default=True).execute()

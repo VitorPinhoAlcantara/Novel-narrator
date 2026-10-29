@@ -210,3 +210,16 @@ def test_log_stops_polling_when_job_ends(client, queue):
 
 def test_static_css_is_served(client):
     assert client.get("/static/app.css").status_code == 200
+
+
+def test_job_page_shows_phrase_and_map(client, queue):
+    job = queue.submit("Novel Teste", CHAPTERS[:2], {"audio"}, None)
+    job.tracker(
+        "plan", {"chapters": CHAPTERS[:2], "outputs": {"audio"}, "download": [], "audio": CHAPTERS[:2], "skipped": []}
+    )
+    job.tracker("audio_start", {"chapter": CHAPTERS[0]})
+    job.tracker("segments", {"ids": ["0000", "0001"], "done": []})
+    job.tracker("segment_start", {"id": "0000", "text": "Uma frase sendo lida.", "worker": 0})
+    page = client.get(f"/jobs/{job.id}").text
+    assert "Uma frase sendo lida." in page and "Gerando agora" in page
+    assert 'data-view="map"' in page and "Vol. 1" in page

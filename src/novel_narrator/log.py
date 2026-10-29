@@ -2,13 +2,21 @@ import threading
 
 _lock = threading.Lock()
 _listeners = []
+_printer = [None]
 
 
 def log(tag, message):
     with _lock:
-        print(f"[{tag}] {message}", flush=True)
+        if _printer[0]:
+            _printer[0](tag, message)
+        else:
+            print(f"[{tag}] {message}", flush=True)
         for listener in _listeners:
             listener(tag, message)
+
+
+def set_printer(printer):
+    _printer[0] = printer
 
 
 def add_listener(listener):

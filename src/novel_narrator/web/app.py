@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 from urllib.parse import quote
 
@@ -10,8 +11,9 @@ from fastapi.templating import Jinja2Templates
 from novel_narrator.cli.menus import list_volumes, parse_numbers
 from novel_narrator.config import load_config
 from novel_narrator.log import format_duration
-from novel_narrator.outputs.files import fetch_chapter_files
+from novel_narrator.outputs.files import fetch_chapter_files, needs_files
 from novel_narrator.pipeline.audiobook import AudiobookSession
+from novel_narrator.pipeline.progress import describe_entry
 from novel_narrator.pipeline.runner import OUTPUT_NAMES, describe_outputs, run_chapters
 from novel_narrator.publish import abs_api, abs_server
 from novel_narrator.sources.base import SourceError
@@ -40,6 +42,8 @@ def create_app(config=None, source=None, jobs=None):
         status_names=STATUS_NAMES,
         describe_outputs=describe_outputs,
         format_duration=format_duration,
+        describe_entry=describe_entry,
+        clock=lambda t: time.strftime("%H:%M", time.localtime(t)),
         running_count=lambda: sum(1 for j in jobs.jobs.values() if j.active),
     )
     app = FastAPI(title="Novel Narrator")
@@ -77,6 +81,7 @@ def create_app(config=None, source=None, jobs=None):
                 lookahead=download["lookahead_chapters"],
                 on_done=job.progress,
                 stop=job.stop,
+                needs_download=lambda c: needs_files(run_config, novel.title, c, outputs, overwrite),
             )
 
         return run

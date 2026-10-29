@@ -35,11 +35,22 @@ def split_downloaded(config, novel_title, chapters, outputs):
     return done, missing
 
 
-def fetch_chapter_files(source, config, novel_title, chapter, outputs, overwrite=False):
+def wanted_files(config, novel_title, chapter, outputs, overwrite=False):
     pdf = pdf_path(config, novel_title, chapter)
     cbz = cbz_path(config, novel_title, chapter)
     want_pdf = "pdf" in outputs and (overwrite or not os.path.exists(pdf))
     want_cbz = "cbz" in outputs and (overwrite or not os.path.exists(cbz))
+    return want_pdf, want_cbz
+
+
+def needs_files(config, novel_title, chapter, outputs, overwrite=False):
+    return any(wanted_files(config, novel_title, chapter, outputs, overwrite))
+
+
+def fetch_chapter_files(source, config, novel_title, chapter, outputs, overwrite=False):
+    pdf = pdf_path(config, novel_title, chapter)
+    cbz = cbz_path(config, novel_title, chapter)
+    want_pdf, want_cbz = wanted_files(config, novel_title, chapter, outputs, overwrite)
     if not (want_pdf or want_cbz):
         return True, None
 

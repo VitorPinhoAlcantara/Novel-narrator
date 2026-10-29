@@ -10,6 +10,7 @@ import soundfile as sf
 from novel_narrator.log import chapter_label, chapter_tag, format_duration, log, summarize_chapters
 from novel_narrator.models import Chapter
 from novel_narrator.outputs.epub_writer import write_volume_epub
+from novel_narrator.pipeline.progress import emit
 from novel_narrator.pipeline.state import classify_segments, load_json, segment_seed, write_json_atomic
 from novel_narrator.publish import abs_server
 from novel_narrator.publish.abs_api import scan_library
@@ -148,6 +149,7 @@ class AudiobookSession:
 
         qa_path = self._write_qa_report(chapter, segments, results)
         self._log("montando o audio e codificando o m4b...")
+        emit("stage", text="montando o áudio e codificando o m4b")
         wav = os.path.join(folder, "chapter.wav")
         destination = os.path.join(abs_server.publish_root(self.config), *self._relative(chapter))
         metadata = chapter_metadata(self.config, self.author, self.novel.title, chapter, spoken_title, self.book_mode)
@@ -160,6 +162,14 @@ class AudiobookSession:
         asr_alerts = sum(1 for r in results.values() if r.get("asr_reasons"))
         qa_alerts = sum(1 for r in results.values() if not r.get("ok") and not r.get("asr_reasons"))
         report = f" | relatorio: {qa_path}" if (asr_alerts or qa_alerts) else ""
+        emit(
+            "audio_done",
+            chapter=chapter,
+            minutes=duration / 60,
+            seconds=time.time() - start,
+            alerts=asr_alerts + qa_alerts,
+            report=qa_path if (asr_alerts or qa_alerts) else "",
+        )
         self._log(
             f"pronto em {format_duration(time.time() - start)}: {duration / 60:.1f} min de audio, "
             f"{len(segments)} trechos | alertas: Whisper {asr_alerts}, QA numerico {qa_alerts}{report}"
@@ -268,6 +278,7 @@ class AudiobookSession:
         self._announce_workers(n, reading)
         pool = TTSPool(self.config, [self._voice_path()], workers=n)
         log("XTTS", f"carregando o modelo em {pool.n_workers} worker(s) (cerca de 1 minuto)...")
+        emit("stage", text="carregando o modelo XTTS")
         self.pool = pool
         try:
             pool.start()
@@ -293,6 +304,7 @@ class AudiobookSession:
         results, to_verify, to_generate = classify_segments(segments, state, folder, uses_asr)
         seeds = {s["id"]: segment_seed(self.novel.title, chapter.volume, chapter.number, s["id"]) for s in segments}
         jobs = [self._job(s, folder, seeds[s["id"]], 0) for s in to_generate]
+        emit("segments", ids=[s["id"] for s in segments], done=list(results))
 
         if results:
             suffix = f" ({len(to_verify)} deles so faltam a verificacao do Whisper)" if to_verify else ""
@@ -318,12 +330,16 @@ class AudiobookSession:
                     progress["quarter"] = quarter
             if advanced:
                 self._log(f"gerando trechos: {quarter * 25}% ({done}/{total})")
+            _segment_done(response)
+
+        def on_start(job, worker):
+            emit("segment_start", id=job["id"], text=texts[job["id"]], worker=worker)
 
         if jobs:
-            results.update(self.pool.generate(jobs, on_done=on_done))
+            results.update(self.pool.generate(jobs, on_done=on_done, on_start=on_start))
         if uses_asr:
             ids = [j["id"] for j in jobs] + to_verify
-            self._verify_with_asr(ids, texts, folder, seeds, results, state, save_state)
+            self._verify_with_asr(ids, texts, folder, seeds, results, state, save_state, on_start)
         return results
 
     def _job(self, segment, folder, seed, round_number):
@@ -341,13 +357,14 @@ class AudiobookSession:
             job["params"] = retry_params
         return job
 
-    def _verify_with_asr(self, ids, texts, folder, seeds, results, state, save_state):
+    def _verify_with_asr(self, ids, texts, folder, seeds, results, state, save_state, on_start=None):
         pending = list(ids)
         rounds = int(self.config["tts"]["asr"]["rounds"])
         analyses = {}
         trimmed = 0
         self._log(f"verificando {len(pending)} trechos com o Whisper...")
         for round_number in range(rounds + 1):
+            emit("stage", text=f"conferindo {len(pending)} trecho(s) com o Whisper")
             transcripts = self.pool.transcribe([(i, os.path.join(folder, f"{i}.wav")) for i in pending])
             bad = []
             for i in pending:
@@ -358,6 +375,7 @@ class AudiobookSession:
                 state[i]["verified"] = True
                 if not analysis["ok"]:
                     bad.append(i)
+                emit("segment_done", id=i, ok=analysis["ok"])
             save_state()
             if self.config["tts"]["trim_final_burst"]:
                 trimmed += self._trim_final_bursts(pending, texts, folder)
@@ -365,7 +383,7 @@ class AudiobookSession:
                 break
             self._log(f"correcao {round_number + 1} de {rounds}: refazendo {len(bad)} trecho(s) que o Whisper reprovou")
             jobs = [self._job({"id": i, "text": texts[i]}, folder, seeds[i], round_number + 1) for i in bad]
-            for i, result in self.pool.generate(jobs).items():
+            for i, result in self.pool.generate(jobs, on_done=_segment_done, on_start=on_start).items():
                 results[i] = result
                 state[i]["result"] = result
                 state[i]["verified"] = False
@@ -521,6 +539,10 @@ class AudiobookSession:
             series_index=volume if volume.isdigit() else None,
             language="pt",
         )
+
+
+def _segment_done(response, *_):
+    emit("segment_done", id=response["id"], ok=bool(response.get("ok")))
 
 
 def _volume_placeholder(volume):

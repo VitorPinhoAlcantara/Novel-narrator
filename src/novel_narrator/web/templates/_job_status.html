@@ -1,6 +1,10 @@
+{% set s = job.tracker.snapshot() %}
 <section id="status" class="card" {% if job.active %}hx-get="/jobs/{{ job.id }}/status" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
   <div class="job-head">
-    <span class="badge {{ job.status }}">{{ status_names[job.status] }}</span>
+    <div>
+      <span class="badge {{ job.status }}">{{ status_names[job.status] }}</span>
+      {% if s.total %}<strong>&nbsp;{{ s.done }} de {{ s.total }}</strong><span class="muted small"> · {{ s.elapsed }} desde o início{% if s.eta %} · ~{{ s.eta }} restantes{% endif %}</span>{% endif %}
+    </div>
     <div class="job-actions">
       {% if job.status in ("queued", "running") %}
       <form method="post" action="/jobs/{{ job.id }}/pause">
@@ -28,13 +32,89 @@
   <p class="muted small">{% if "audio" in job.outputs %}Encerrando o XTTS e terminando os downloads em andamento.{% else %}Terminando os downloads em andamento.{% endif %}</p>
   {% elif job.status == "paused" %}
   <p class="muted small">Pausado.{% if "audio" in job.outputs %} A GPU está livre; ao retomar, o capítulo interrompido continua do trecho em que parou.{% endif %}</p>
+  {% elif job.status == "queued" and not s.total %}
+  <p class="muted small">Aguardando outro trabalho terminar.</p>
   {% endif %}
-  <div class="stats">
-    <div class="stat"><div class="label">Capítulos</div><div class="value">{{ job.done }}<span class="muted small"> / {{ job.total }}</span></div></div>
-    <div class="stat"><div class="label">Progresso</div><div class="value">{{ job.percent }}%</div></div>
-    <div class="stat"><div class="label">Com erro</div><div class="value">{{ job.failures | length }}</div></div>
+
+  {% if s.total %}
+  <div class="plan">
+    {% if s.skipped %}<span class="badge skip">{{ s.skipped }} já existiam</span>{% endif %}
+    {% if s.only_files %}<span class="badge">{{ s.only_files }} só {{ s.file_names }}</span>{% endif %}
+    {% if s.with_audio %}<span class="badge">{{ s.with_audio }} com áudio</span>{% endif %}
+    {% if s.warned %}<span class="badge warn">{{ s.warned }} com alerta</span>{% endif %}
+    {% if s.failed %}<span class="badge bad">{{ s.failed }} com erro</span>{% endif %}
   </div>
-  <div class="bar big-bar {{ 'done' if job.status == 'done' }}" role="progressbar" aria-valuenow="{{ job.percent }}" aria-valuemin="0" aria-valuemax="100"><span style="width: {{ job.percent }}%"></span></div>
+  <div class="stats">
+    {% if s.dl_total %}
+    <div class="stat">
+      <div class="label">Downloads ({{ s.file_names }}){% if s.downloading is not none %} · baixando cap {{ s.downloading }}{% endif %}</div>
+      <div class="value">{{ s.dl_done }}<span class="muted small"> / {{ s.dl_total }}</span></div>
+      <div class="bar {{ 'done' if s.dl_done == s.dl_total }}"><span style="width: {{ (100 * s.dl_done / s.dl_total) | int }}%"></span></div>
+    </div>
+    {% endif %}
+    {% if s.audio_total %}
+    <div class="stat">
+      <div class="label">Áudios{% if s.eta %} · ~{{ s.eta }}{% endif %}</div>
+      <div class="value">{{ s.audio_done }}<span class="muted small"> / {{ s.audio_total }}</span></div>
+      <div class="bar {{ 'done' if s.audio_done == s.audio_total }}"><span style="width: {{ (100 * s.audio_done / s.audio_total) | int }}%"></span></div>
+    </div>
+    {% endif %}
+    {% if not s.dl_total and not s.audio_total %}
+    <div class="stat">
+      <div class="label">Capítulos</div>
+      <div class="value">{{ s.done }}<span class="muted small"> / {{ s.total }}</span></div>
+      <div class="bar done"><span style="width: 100%"></span></div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="view-now">
+    {% if s.current %}
+    {% set c = s.current %}
+    <div class="now">
+      <div class="now-head">
+        <div><div class="muted small">Gerando agora</div><strong>Cap {{ c.number }} · {{ c.title }}</strong></div>
+        <span class="muted small">{% if c.stage %}{{ c.stage }}{% else %}trecho {{ c.done }} de {{ c.total }}{% if c.active | length > 1 %} · {{ c.active | length }} workers{% endif %}{% endif %}</span>
+      </div>
+      {% if c.segments %}<div class="segs" aria-label="{{ c.done }} de {{ c.total }} trechos">{% for seg in c.segments %}<i class="{{ seg }}"></i>{% endfor %}</div>{% endif %}
+      {% if c.active %}
+      <ul class="phrases">
+        {% for text in c.active %}<li><span class="worker">{% if c.active | length > 1 %}Worker {{ loop.index }}{% else %}Convertendo{% endif %}</span>{{ text }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+    {% endif %}
+    {% if s.feed %}
+    <div class="section">
+      <h3>Últimos concluídos</h3>
+      <ul class="feed">
+        {% for time, entry in s.feed[:8] %}
+        <li>
+          <span class="time">{{ clock(time) }}</span>
+          <b>{{ entry.number }}</b>
+          <span>{{ entry.title }}</span>
+          <span class="tags">{% for kind, text in describe_entry(entry, s.outputs) %}<span class="badge {{ kind }}">{{ text }}</span>{% endfor %}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="view-map">
+    <div class="legend">
+      <span><i class="ok"></i>concluído</span><span><i class="skip"></i>já existia</span><span><i class="run"></i>gerando áudio</span>
+      <span><i class="dl"></i>baixando</span><span><i class="warn"></i>com alerta</span><span><i class="bad"></i>erro</span><span><i></i>na fila</span>
+    </div>
+    {% for volume, items in s.volumes %}
+    <div class="vol">
+      <div class="vol-head"><b>{% if volume %}Vol. {{ volume }}{% else %}Capítulos{% endif %}</b><span class="muted">{{ items | length }} caps · {{ items[0].number }}–{{ items[-1].number }}</span></div>
+      <div class="tiles">{% for e in items %}<i class="{{ e.tile }}" title="Cap {{ e.number }} · {{ e.title }}{% for kind, text in describe_entry(e, s.outputs) if e.state != 'wait' %} · {{ text }}{% endfor %}"></i>{% endfor %}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   {% if job.error %}<div class="alert section">Erro: {{ job.error }}</div>{% endif %}
   {% if job.failures %}
   <div class="section">

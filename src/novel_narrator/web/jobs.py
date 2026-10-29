@@ -5,6 +5,8 @@ import time
 from dataclasses import dataclass, field
 
 from novel_narrator.log import add_listener, remove_listener
+from novel_narrator.pipeline import progress
+from novel_narrator.pipeline.progress import Tracker
 
 MAX_LINES = 400
 
@@ -27,6 +29,7 @@ class Job:
     base: int = 0
     stop: threading.Event = field(default_factory=threading.Event)
     on_stop: list = field(default_factory=list)
+    tracker: Tracker = field(default_factory=Tracker)
 
     @property
     def active(self):
@@ -89,6 +92,7 @@ class JobQueue:
 
         job.status = "running"
         add_listener(listen)
+        progress.add_listener(job.tracker)
         try:
             result = job.task(job)
             job.failures += result["failures"]
@@ -102,3 +106,4 @@ class JobQueue:
             job.status = "failed"
         finally:
             remove_listener(listen)
+            progress.remove_listener(job.tracker)

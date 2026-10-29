@@ -202,7 +202,7 @@ class TTSPool:
     def __exit__(self, *exc):
         self.close()
 
-    def generate(self, jobs, on_done=None):
+    def generate(self, jobs, on_done=None, on_start=None):
         pending = queue.Queue()
         for job in jobs:
             pending.put(job)
@@ -223,6 +223,8 @@ class TTSPool:
                     job = pending.get_nowait()
                 except queue.Empty:
                     return
+                if on_start:
+                    on_start(job, worker.index)
                 response = worker.send(job)
                 if self.aborted:
                     return
