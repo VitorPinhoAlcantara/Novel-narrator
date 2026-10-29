@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from novel_narrator.cli.menus import list_volumes, parse_numbers
+from novel_narrator.cli.menus import file_picker, list_volumes, parse_numbers
 from novel_narrator.config import load_config
 from novel_narrator.log import format_duration
 from novel_narrator.outputs.files import fetch_chapter_files, needs_files
@@ -150,6 +150,12 @@ def create_app(config=None, source=None, jobs=None):
             default_library=config["abs"]["library"],
             estimate=estimated_duration_s,
         )
+
+    @app.get("/epub/pick")
+    def epub_pick():
+        # The server only listens on 127.0.0.1, so the native dialog opens on the user's own screen.
+        path = file_picker()
+        return RedirectResponse(f"/epub?path={quote(path, safe='')}" if path else "/epub", status_code=303)
 
     @app.post("/epub/run")
     async def epub_run(request: Request):

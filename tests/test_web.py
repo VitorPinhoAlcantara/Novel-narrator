@@ -223,3 +223,12 @@ def test_job_page_shows_phrase_and_map(client, queue):
     page = client.get(f"/jobs/{job.id}").text
     assert "Uma frase sendo lida." in page and "Gerando agora" in page
     assert 'data-view="map"' in page and "Vol. 1" in page
+
+
+@pytest.mark.parametrize(
+    ("picked", "location"), [(r"C:\Livros\a b.pdf", "/epub?path=C%3A%5CLivros%5Ca%20b.pdf"), (None, "/epub")]
+)
+def test_epub_pick_redirects_with_the_chosen_path(client, monkeypatch, picked, location):
+    monkeypatch.setattr(web_app, "file_picker", lambda: picked)
+    response = client.get("/epub/pick", follow_redirects=False)
+    assert response.status_code == 303 and response.headers["location"] == location

@@ -5,6 +5,7 @@
 <form method="get" action="/epub" class="search">
   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm8 1.5V8h4.5L14 3.5Z"/></svg>
   <input type="text" name="path" value="{{ path }}" placeholder="C:\Livros\meu-livro.epub" aria-label="Caminho do arquivo" required>
+  <a href="/epub/pick" class="btn ghost">Escolher arquivo</a>
   <button type="submit" class="btn">Abrir</button>
 </form>
 {% if error %}<div class="alert section">{{ error }}</div>{% endif %}
