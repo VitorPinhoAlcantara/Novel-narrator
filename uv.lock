@@ -989,19 +989,6 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-finetune = [
-    { name = "coqui-tts" },
-    { name = "coqui-tts-trainer" },
-    { name = "librosa" },
-    { name = "pandas" },
-    { name = "scipy" },
-    { name = "tensorboard" },
-    { name = "tokenizers" },
-    { name = "torch" },
-    { name = "torchaudio" },
-    { name = "torchcodec" },
-    { name = "transformers" },
-]
 tts = [
     { name = "coqui-tts" },
     { name = "librosa" },
@@ -1030,23 +1017,19 @@ dev = [
 requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.15" },
     { name = "coqui-tts", marker = "extra == 'tts'", specifier = "==0.27.5" },
-    { name = "coqui-tts-trainer", marker = "extra == 'finetune'", specifier = "==0.3.3" },
     { name = "fastapi", marker = "extra == 'web'", specifier = ">=0.115" },
     { name = "inquirerpy", specifier = ">=0.3.4" },
     { name = "jinja2", marker = "extra == 'web'", specifier = ">=3.1" },
     { name = "librosa", marker = "extra == 'tts'", specifier = "==1.0.0" },
     { name = "lxml", specifier = ">=6.1" },
-    { name = "novel-narrator", extras = ["tts"], marker = "extra == 'finetune'" },
     { name = "num2words", specifier = ">=0.5.14" },
     { name = "numpy", specifier = ">=2.5" },
-    { name = "pandas", marker = "extra == 'finetune'", specifier = "==3.0.6" },
     { name = "pillow", specifier = ">=12.3" },
     { name = "pymupdf", specifier = ">=1.28" },
     { name = "python-multipart", marker = "extra == 'web'", specifier = ">=0.0.9" },
     { name = "requests", specifier = ">=2.33" },
     { name = "scipy", marker = "extra == 'tts'", specifier = "==1.18.1" },
     { name = "soundfile", specifier = ">=0.14" },
-    { name = "tensorboard", marker = "extra == 'finetune'", specifier = "==2.21.0" },
     { name = "tokenizers", marker = "extra == 'tts'", specifier = "==0.22.2" },
     { name = "tomli-w", specifier = ">=1.2" },
     { name = "torch", marker = "extra == 'tts'", specifier = "==2.13.0", index = "https://download.pytorch.org/whl/cu130" },
@@ -1055,7 +1038,7 @@ requires-dist = [
     { name = "transformers", marker = "extra == 'tts'", specifier = "==5.8.0" },
     { name = "uvicorn", marker = "extra == 'web'", specifier = ">=0.32" },
 ]
-provides-extras = ["tts", "finetune", "web"]
+provides-extras = ["tts", "web"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1295,26 +1278,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/7d/fa/3944b40b07da9ce895c0e6303a5ab7d53da063554f534556b134a54d6093/packaging-26.3.tar.gz", hash = "sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79", size = 313412, upload-time = "2026-08-04T18:15:28.737Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl", hash = "sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c", size = 129956, upload-time = "2026-08-04T18:15:27.159Z" },
-]
-
-[[package]]
-name = "pandas"
-version = "3.0.6"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy" },
-    { name = "python-dateutil" },
-    { name = "tzdata", marker = "sys_platform == 'win32'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/e2/17/d7b106e05bfa642e8694451e7d3d759c6a241c5386a5d962e4f66c047e06/pandas-3.0.6.tar.gz", hash = "sha256:66b07ef7315a31bfe1089cd3d71a7de781c9dca986762d0b4fe7c0ef17465d10", size = 4667686, upload-time = "2026-09-17T23:23:18.345Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/67/fa/613d867c3d9554a61bafdec6f79565c8a3e73235feb52cc4a72ad2e0fa6a/pandas-3.0.6-cp312-cp312-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:e3dccb584123b399c07562ac4d62543e90ede49ddf8ce3c13ffc64cbe828c281", size = 10303429, upload-time = "2026-09-17T23:20:55.597Z" },
-    { url = "https://files.pythonhosted.org/packages/cb/67/0c0f18e38d7f2d2af8c24b3315bc4046e73bbdd4a5540405506671ad0c0d/pandas-3.0.6-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:0704044b676496b8350e023b09f174a26772456c974a2b11c36bebb558c9490d", size = 10788193, upload-time = "2026-09-17T23:20:58.617Z" },
-    { url = "https://files.pythonhosted.org/packages/39/53/1b57f3162501fe36687e4870e1b918a6458ca7386b173af75663ace95857/pandas-3.0.6-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:e7c1905ef02c3d6d43d9dbd5b6ccb4da4870a0b0c821bbc103fbdb6f3ad2707b", size = 11323501, upload-time = "2026-09-17T23:21:01.911Z" },
-    { url = "https://files.pythonhosted.org/packages/f2/d2/b1182e8d39100369d7f13f4a125a3fb6b096fef112c46d0566c25781ff68/pandas-3.0.6-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:569e114072b24fc4970c12e2b4bab252671668a40b324318903380cab0254c0c", size = 11838173, upload-time = "2026-09-17T23:21:04.85Z" },
-    { url = "https://files.pythonhosted.org/packages/c7/33/5b717af24d2f27995e51e0875a269dddd373045216e34cf62e3aa764eaa1/pandas-3.0.6-cp312-cp312-pyemscripten_2024_0_wasm32.whl", hash = "sha256:2a8fc94be2ee5f1d86f97aacd8cc566f81680b6498e76f3007421bb5d98151bf", size = 7118499, upload-time = "2026-09-17T23:21:07.661Z" },
-    { url = "https://files.pythonhosted.org/packages/bd/2a/14b3b17cd75cef4a1ee1af4234eb41cc1afe4103b98c2d80e8916abfd42b/pandas-3.0.6-cp312-cp312-win_amd64.whl", hash = "sha256:3ef908d28590b3f42d7070e7ad8f9b34b442b260b7f3c1afb57e0040c58cdb1b", size = 9661439, upload-time = "2026-09-17T23:21:10.959Z" },
-    { url = "https://files.pythonhosted.org/packages/3b/11/3d580a604a1e35d69f6676847bd12db7d14344bc677b717f4413e79c5d0d/pandas-3.0.6-cp312-cp312-win_arm64.whl", hash = "sha256:f4e7c52eb108d752e7592268108fd3e98efd76d83a3125cdd06c621c2e44359b", size = 8959806, upload-time = "2026-09-17T23:21:13.851Z" },
 ]
 
 [[package]]

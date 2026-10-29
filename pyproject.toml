@@ -34,12 +34,6 @@ tts = [
     "torchcodec==0.16.0",
     "transformers==5.8.0",
 ]
-finetune = [
-    "novel-narrator[tts]",
-    "coqui-tts-trainer==0.3.3",
-    "pandas==3.0.6",
-    "tensorboard==2.21.0",
-]
 web = [
     "fastapi>=0.115",
     "jinja2>=3.1",

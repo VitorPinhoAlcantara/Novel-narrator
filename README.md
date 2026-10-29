@@ -100,6 +100,10 @@ uv run pytest
 
 The tests use a fake TTS worker, so they need neither a GPU nor the `tts` extra.
 
+## History and fine-tuning
+
+This is the second version of the project, formerly `centralnovel-downloader`. The first version is kept in the [`v1-legado`](https://github.com/VitorPinhoAlcantara/Novel-narrator/tree/v1-legado) tag, together with the scripts used to fine-tune the XTTS voice (`scripts/finetune`) and the TTS experiments (`scripts/tts_lab`).
+
 ## License
 
 This project is licensed under the [GNU Affero General Public License v3.0 or later](LICENSE). It depends on PyMuPDF, which is AGPL-3.0, and it ships a web interface, so the AGPL keeps the whole program under compatible terms.
