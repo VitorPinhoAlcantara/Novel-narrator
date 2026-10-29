@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 
 from novel_narrator.models import Chapter, Novel
 from novel_narrator.sources.base import Source
+from novel_narrator.sources.convert import to_epub
 
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
@@ -21,11 +22,11 @@ _NOT_FOR_AUDIO = re.compile(
 
 
 class EpubSource(Source):
-    name = "EPUB local"
+    name = "Arquivo local"
 
     def __init__(self, path):
         self.path = str(path)
-        self._novel, self._chapters, self._cover = read_epub(self.path)
+        self._novel, self._chapters, self._cover = read_epub(to_epub(self.path))
 
     def novel(self, url=None):
         return self._novel

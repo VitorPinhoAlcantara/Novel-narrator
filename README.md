@@ -6,7 +6,7 @@ The program's menus and web interface are in Portuguese. *Resumo em português n
 
 ## Features
 
-- **Sources:** CentralNovel (search, popular list, or a pasted link) and local EPUB files.
+- **Sources:** CentralNovel (search, popular list, or a pasted link) and local EPUB, PDF or DOCX files (PDF/DOCX are converted to EPUB first).
 - **Outputs:** CBZ and audiobook on by default, PDF optional. Before each run, a plan shows what already exists and what is missing, per output, so finished chapters are skipped and a chapter only produces the output it lacks.
 - **Audiobooks:**
   - XTTS v2 runs in worker processes. The number of workers adapts to the GPU's load and free VRAM.
@@ -59,7 +59,7 @@ uv run novel-narrator
 Opens the terminal menus. From there you can:
 
 - **CentralNovel:** search for a novel or paste its link, choose volumes or chapters, then choose the outputs.
-- **EPUB local:** pick a `.epub`, choose the chapters, and publish it as a single audiobook in a library you choose.
+- **Arquivo local:** pick a `.epub`, `.pdf` or `.docx`, choose the chapters, and publish it as a single audiobook in a library you choose.
 - **Configs ABS:** set up and test the Audiobookshelf connection.
 
 ```bash

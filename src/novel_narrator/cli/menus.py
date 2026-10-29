@@ -15,6 +15,7 @@ from novel_narrator.pipeline.runner import describe_outputs, run_chapters
 from novel_narrator.publish import abs_api, abs_server
 from novel_narrator.sources.base import SourceError
 from novel_narrator.sources.centralnovel import CentralNovel
+from novel_narrator.sources.convert import is_book
 from novel_narrator.sources.epub import EpubSource, estimated_duration_s
 
 ALL = "__all__"
@@ -27,7 +28,7 @@ def main_menu():
             message="NOVEL NARRATOR",
             choices=[
                 {"name": "CentralNovel (baixar novels: CBZ, PDF, audiolivro)", "value": "centralnovel"},
-                {"name": "EPUB local (gerar audiolivro de um arquivo .epub)", "value": "epub"},
+                {"name": "Arquivo local (gerar audiolivro de um .epub, .pdf ou .docx)", "value": "epub"},
                 {"name": "Configs ABS (servidor e biblioteca)", "value": "abs"},
                 {"name": "Sair", "value": "quit"},
             ],
@@ -135,19 +136,19 @@ def epub_menu():
         return
     try:
         source = EpubSource(path)
-    except (zipfile.BadZipFile, KeyError, ValueError, OSError, AttributeError, TypeError) as exc:
-        print(f"[ERRO] Nao foi possivel ler o EPUB: {exc}")
+    except (zipfile.BadZipFile, KeyError, ValueError, OSError, AttributeError, TypeError, RuntimeError) as exc:
+        print(f"[ERRO] Nao foi possivel ler o arquivo: {exc}")
         inquirer.confirm(message="Voltar", default=True).execute()
         return
     novel, chapters = source.novel(), source.chapters()
     if not chapters:
-        print("[ERRO] Nenhum texto encontrado nesse EPUB.")
+        print("[ERRO] Nenhum texto encontrado nesse arquivo.")
         inquirer.confirm(message="Voltar", default=True).execute()
         return
 
     clear_screen()
     print(f"Livro: {novel.title}")
-    print(f"Autor: {novel.author or '(nao informado no EPUB)'}")
+    print(f"Autor: {novel.author or '(nao informado no arquivo)'}")
     print(f"Capa: {'sim' if source.cover() else 'nao'} | Capitulos com texto: {len(chapters)}")
     print("Ja vem marcado o que parece ser conteudo; sumario, indice, notas e paginas curtas ficam desmarcados.\n")
     chosen = checkbox_with_all(
@@ -565,16 +566,16 @@ def test_everything(abs_cfg):
 
 
 def ask_epub():
-    print("Abrindo a janela para escolher o arquivo .epub...")
+    print("Abrindo a janela para escolher o arquivo (.epub, .pdf ou .docx)...")
     path = file_picker()
     if path:
         return path
     print("Nenhum arquivo escolhido na janela.")
     path = clean_path(
         inquirer.filepath(
-            message="Arraste o arquivo .epub para esta janela ou cole o caminho (vazio volta):",
-            validate=lambda text: clean_path(text) == "" or is_epub(clean_path(text)),
-            invalid_message="Informe um arquivo .epub que exista",
+            message="Arraste o arquivo (.epub, .pdf ou .docx) para esta janela ou cole o caminho (vazio volta):",
+            validate=lambda text: clean_path(text) == "" or is_book(clean_path(text)),
+            invalid_message="Informe um arquivo .epub, .pdf ou .docx que exista",
         ).execute()
     )
     return path or None
@@ -591,16 +592,16 @@ def file_picker():
         try:
             path = filedialog.askopenfilename(
                 parent=root,
-                title="Escolha o arquivo .epub",
+                title="Escolha o livro",
                 initialdir=os.path.join(os.path.expanduser("~"), "Downloads"),
-                filetypes=[("Livros EPUB", "*.epub"), ("Todos os arquivos", "*.*")],
+                filetypes=[("Livros", "*.epub *.pdf *.docx"), ("Todos os arquivos", "*.*")],
             )
         finally:
             root.destroy()
     except Exception:
         return None
     path = os.path.normpath(path) if path else ""
-    return path if is_epub(path) else None
+    return path if is_book(path) else None
 
 
 def clean_path(text):
@@ -608,10 +609,6 @@ def clean_path(text):
     if text.startswith("& "):
         text = text[2:].strip()
     return text.strip("'\"").strip()
-
-
-def is_epub(path):
-    return bool(path) and path.lower().endswith(".epub") and os.path.isfile(path)
 
 
 def parse_numbers(text):

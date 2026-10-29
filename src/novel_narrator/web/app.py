@@ -135,7 +135,7 @@ def create_app(config=None, source=None, jobs=None):
             try:
                 book = EpubSource(path.strip().strip("\"'"))
             except Exception as exc:
-                error = f"Nao foi possivel ler o EPUB: {exc}"
+                error = f"Nao foi possivel ler o arquivo: {exc}"
             try:
                 libraries = abs_api.list_libraries(config["abs"])
             except requests.RequestException as exc:

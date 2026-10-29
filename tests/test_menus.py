@@ -67,7 +67,7 @@ def test_main_menu_has_four_options():
         menus.main_menu()
     names = captured["names"]
     assert len(names) == 4
-    assert names[0].startswith("CentralNovel") and names[1].startswith("EPUB local")
+    assert names[0].startswith("CentralNovel") and names[1].startswith("Arquivo local")
     assert names[2].startswith("Configs ABS") and names[3] == "Sair"
 
 
