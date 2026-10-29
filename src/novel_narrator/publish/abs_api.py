@@ -97,6 +97,8 @@ def sync_chapters(abs_cfg, library, folders, wait_s=300, poll_s=5, sleep=time.sl
                 media = _api(abs_cfg, "GET", f"items/{item_id}", params={"expanded": 1})["media"]
                 tracks = media.get("tracks", [])
                 if len(tracks) < expected:
+                    # ABS drops a library scan requested while another is running; rescan just this item
+                    _api(abs_cfg, "POST", f"items/{item_id}/scan")
                     continue
                 del pending[rel_path]
                 wanted = chapters_from_tracks(tracks)

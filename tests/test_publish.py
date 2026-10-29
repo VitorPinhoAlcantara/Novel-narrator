@@ -69,10 +69,14 @@ class FakeAbs:
         self.tracks_per_poll = list(tracks_per_poll)
         self.chapters = list(chapters)
         self.posted = []
+        self.scans = []
 
     def __call__(self, abs_cfg, method, path, **kwargs):
         if path.endswith("/items"):
             return {"results": [{"id": "li_1", "relPath": "Autor/Novel/Vol. 8 - Novel Volume 8"}]}
+        if path.endswith("/scan"):
+            self.scans.append(path)
+            return {}
         if method == "POST":
             self.posted.append(kwargs["json"]["chapters"])
             return {}
@@ -91,6 +95,7 @@ def test_chapters_follow_tracks_after_the_scan_finishes(monkeypatch):
     )
     monkeypatch.setattr(abs_api, "_api", fake)
     assert abs_api.sync_chapters({}, {"id": "lib"}, FOLDER, sleep=lambda s: None) == 1
+    assert fake.scans == ["items/li_1/scan"]
     assert [c["title"] for c in fake.posted[0]] == ["1591 - Capitulo 1591 - Anos Depois", "1592 - Capitulo 1592 - X"]
     assert fake.posted[0][1]["start"] == 546.2 and fake.posted[0][1]["end"] == 1114.2
 
