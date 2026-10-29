@@ -37,7 +37,7 @@ uv sync --extra tts --extra web
 - `web` installs the local web interface.
 - Without extras, only the downloads (CBZ/PDF) and the terminal menus work.
 
-On Windows, if uv complains about hard links, set `UV_LINK_MODE=copy`.
+The project sets `link-mode = "copy"` for uv, so packages are copied into `.venv` instead of hard-linked from the cache (hard links fail on Windows when the cache and the project are on different drives).
 
 Then create your configuration:
 
