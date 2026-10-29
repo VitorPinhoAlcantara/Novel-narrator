@@ -13,7 +13,7 @@ from novel_narrator.outputs.epub_writer import write_volume_epub
 from novel_narrator.pipeline.progress import emit
 from novel_narrator.pipeline.state import classify_segments, load_json, segment_seed, write_json_atomic
 from novel_narrator.publish import abs_server
-from novel_narrator.publish.abs_api import scan_library
+from novel_narrator.publish.abs_api import scan_library, sync_chapters
 from novel_narrator.sources.base import SourceError
 from novel_narrator.text.emotion import classify
 from novel_narrator.text.normalize import adjust_ending, normalize
@@ -93,6 +93,7 @@ class AudiobookSession:
         self._prepared = False
         self._prepare_error = None
         self._tag = "audio"
+        self._syncs = []
 
     def pending(self, chapter, overwrite=False):
         self.prepare()
@@ -189,6 +190,8 @@ class AudiobookSession:
     def close(self):
         try:
             self._publish_batch()
+            for thread in self._syncs:
+                thread.join()
         finally:
             if self.pool is not None:
                 self.pool.close()
@@ -505,7 +508,19 @@ class AudiobookSession:
             log("Envio", f"OK: {sent} arquivo(s) enviados a {self.config['abs']['ssh']} (audios, capa e EPUB)")
         else:
             log("Envio", f"OK: {len(published)} capitulo(s) gravados em {self.config['abs']['local_dir']}")
-        scan_library(self.config["abs"])
+        library = scan_library(self.config["abs"])
+        if library:
+            folders = {}
+            for chapter in published:
+                folder = self._relative(chapter)[:-1]
+                folders["/".join(folder)] = self._track_count(folder)
+            thread = threading.Thread(target=sync_chapters, args=(self.config["abs"], library, folders), daemon=True)
+            thread.start()
+            self._syncs.append(thread)
+
+    def _track_count(self, folder):
+        extension = f".{self.config['audiobook']['format']}"
+        return sum(1 for parts in self.existing if parts[:-1] == folder and parts[-1].endswith(extension))
 
     def _texts_folder(self, volume):
         return os.path.join(self.data_dir, "texts", safe_name(self.novel.title), f"vol_{volume}")

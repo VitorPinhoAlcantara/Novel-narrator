@@ -1,6 +1,7 @@
 import copy
 
 from novel_narrator.config import DEFAULTS
+from novel_narrator.publish import abs_api
 from novel_narrator.publish.abs_api import libraries_sharing_folder, server_folder
 from novel_narrator.publish.abs_server import local_files, outbox_dir, outbox_root, publish_root
 
@@ -57,3 +58,55 @@ def test_upload_skips_partial_files(tmp_path):
     (tmp_path / "a" / "ok.m4b").write_bytes(b"1234")
     (tmp_path / "a" / "cut.m4b.part").write_bytes(b"12")
     assert local_files(str(tmp_path)) == {"a/ok.m4b": 4}
+
+
+def track(index, start, duration, name):
+    return {"index": index, "startOffset": start, "duration": duration, "metadata": {"filename": f"{name}.m4b"}}
+
+
+class FakeAbs:
+    def __init__(self, tracks_per_poll, chapters=()):
+        self.tracks_per_poll = list(tracks_per_poll)
+        self.chapters = list(chapters)
+        self.posted = []
+
+    def __call__(self, abs_cfg, method, path, **kwargs):
+        if path.endswith("/items"):
+            return {"results": [{"id": "li_1", "relPath": "Autor/Novel/Vol. 8 - Novel Volume 8"}]}
+        if method == "POST":
+            self.posted.append(kwargs["json"]["chapters"])
+            return {}
+        tracks = self.tracks_per_poll.pop(0) if len(self.tracks_per_poll) > 1 else self.tracks_per_poll[0]
+        return {"media": {"tracks": tracks, "chapters": self.chapters}}
+
+
+TRACKS = [track(1, 0, 546.2, "1591 - Capitulo 1591 - Anos Depois"), track(2, 546.2, 568, "1592 - Capitulo 1592 - X")]
+FOLDER = {"Autor/Novel/Vol. 8 - Novel Volume 8": 2}
+
+
+def test_chapters_follow_tracks_after_the_scan_finishes(monkeypatch):
+    fake = FakeAbs(
+        [TRACKS[:1], TRACKS],
+        chapters=[{"id": 0, "start": 0, "end": 546.2, "title": "1591 - Capitulo 1591 - Anos Depois"}],
+    )
+    monkeypatch.setattr(abs_api, "_api", fake)
+    assert abs_api.sync_chapters({}, {"id": "lib"}, FOLDER, sleep=lambda s: None) == 1
+    assert [c["title"] for c in fake.posted[0]] == ["1591 - Capitulo 1591 - Anos Depois", "1592 - Capitulo 1592 - X"]
+    assert fake.posted[0][1]["start"] == 546.2 and fake.posted[0][1]["end"] == 1114.2
+
+
+def test_chapters_already_matching_are_left_alone(monkeypatch):
+    fake = FakeAbs([TRACKS], chapters=abs_api.chapters_from_tracks(TRACKS))
+    monkeypatch.setattr(abs_api, "_api", fake)
+    assert abs_api.sync_chapters({}, {"id": "lib"}, FOLDER, sleep=lambda s: None) == 0
+    assert fake.posted == []
+
+
+def test_gives_up_when_the_scan_takes_too_long(monkeypatch):
+    fake = FakeAbs([TRACKS[:1]])
+    monkeypatch.setattr(abs_api, "_api", fake)
+    ticks = iter(range(0, 1000, 10))
+    updated = abs_api.sync_chapters(
+        {}, {"id": "lib"}, FOLDER, wait_s=30, sleep=lambda s: None, clock=lambda: next(ticks)
+    )
+    assert updated == 0 and fake.posted == []
