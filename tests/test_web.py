@@ -125,6 +125,18 @@ def test_retry_runs_only_failed_chapters(client, queue):
     assert queue.jobs[2].chapters == [CHAPTERS[1]] and queue.jobs[2].task == "task"
 
 
+def test_redo_warned_reruns_only_chapters_with_alerts(client, queue):
+    job = queue.submit("Novel Teste", CHAPTERS, {"audio"}, "task")
+    job.status = "done"
+    job.tracker.chapters = {
+        (str(c.volume).strip(), c.number): {"key": (str(c.volume).strip(), c.number), "state": s}
+        for c, s in zip(CHAPTERS[:3], ["ok", "warn", "ok"], strict=True)
+    }
+    response = client.post(f"/jobs/{job.id}/redo-warned", follow_redirects=False)
+    assert response.headers["location"] == "/jobs/2"
+    assert queue.jobs[2].chapters == [CHAPTERS[1]] and queue.jobs[2].redo
+
+
 def test_unknown_job_is_404(client):
     assert client.get("/jobs/99").status_code == 404
 

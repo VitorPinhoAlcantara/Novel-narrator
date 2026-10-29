@@ -75,8 +75,9 @@ def chapter_metadata(config, author, novel_title, chapter, spoken_title, book_mo
 
 
 class AudiobookSession:
-    def __init__(self, source, novel, config, voice=None, book_mode=False):
+    def __init__(self, source, novel, config, voice=None, book_mode=False, seed_salt=None):
         self.source = source
+        self.seed_salt = seed_salt
         self.novel = novel
         self.config = config
         self.voice = voice or config["tts"]["voice"]
@@ -305,7 +306,11 @@ class AudiobookSession:
         state = load_json(state_path)
         uses_asr = bool(self.config["tts"]["asr"]["enabled"])
         results, to_verify, to_generate = classify_segments(segments, state, folder, uses_asr)
-        seeds = {s["id"]: segment_seed(self.novel.title, chapter.volume, chapter.number, s["id"]) for s in segments}
+        # A redo needs fresh seeds, otherwise XTTS repeats the same flawed takes.
+        salt = () if self.seed_salt is None else (self.seed_salt,)
+        seeds = {
+            s["id"]: segment_seed(self.novel.title, chapter.volume, chapter.number, s["id"], *salt) for s in segments
+        }
         jobs = [self._job(s, folder, seeds[s["id"]], 0) for s in to_generate]
         emit("segments", ids=[s["id"] for s in segments], done=list(results))
 

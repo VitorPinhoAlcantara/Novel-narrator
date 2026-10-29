@@ -65,8 +65,12 @@ def create_app(config=None, source=None, jobs=None):
         download = run_config["download"]
 
         def run(job):
+            redo = overwrite or job.redo
+            salt = time.time_ns() if job.redo else None
             audio = (
-                AudiobookSession(task_source, novel, run_config, book_mode=book_mode) if "audio" in outputs else None
+                AudiobookSession(task_source, novel, run_config, book_mode=book_mode, seed_salt=salt)
+                if "audio" in outputs
+                else None
             )
             if audio is not None:
                 job.on_stop.append(audio.abort)
@@ -74,14 +78,14 @@ def create_app(config=None, source=None, jobs=None):
                 job.chapters,
                 novel.title,
                 outputs,
-                fetch=lambda c: fetch_chapter_files(task_source, run_config, novel.title, c, outputs, overwrite),
+                fetch=lambda c: fetch_chapter_files(task_source, run_config, novel.title, c, outputs, redo),
                 audio=audio,
-                overwrite=overwrite,
+                overwrite=redo,
                 parallel=download["parallel"],
                 lookahead=download["lookahead_chapters"],
                 on_done=job.progress,
                 stop=job.stop,
-                needs_download=lambda c: needs_files(run_config, novel.title, c, outputs, overwrite),
+                needs_download=lambda c: needs_files(run_config, novel.title, c, outputs, redo),
             )
 
         return run
@@ -201,6 +205,13 @@ def create_app(config=None, source=None, jobs=None):
         if job.active or not job.failures:
             raise HTTPException(400, "Nada para tentar de novo")
         return RedirectResponse(f"/jobs/{jobs.retry(job).id}", status_code=303)
+
+    @app.post("/jobs/{job_id}/redo-warned")
+    def job_redo_warned(job_id: int):
+        job = find_job(job_id)
+        if job.active or not job.warned:
+            raise HTTPException(400, "Nenhum capitulo com alerta")
+        return RedirectResponse(f"/jobs/{jobs.redo_warned(job).id}", status_code=303)
 
     @app.post("/jobs/{job_id}/pause")
     def job_pause(job_id: int):

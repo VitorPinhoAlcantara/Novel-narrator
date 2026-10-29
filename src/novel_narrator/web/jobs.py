@@ -30,6 +30,11 @@ class Job:
     stop: threading.Event = field(default_factory=threading.Event)
     on_stop: list = field(default_factory=list)
     tracker: Tracker = field(default_factory=Tracker)
+    redo: bool = False
+
+    @property
+    def warned(self):
+        return [e["key"] for e in self.tracker.chapters.values() if e["state"] == "warn"]
 
     @property
     def active(self):
@@ -75,6 +80,13 @@ class JobQueue:
 
     def retry(self, job):
         return self.submit(job.title, [f["chapter"] for f in job.failures], job.outputs, job.task)
+
+    def redo_warned(self, job):
+        keys = set(job.warned)
+        chapters = [c for c in job.chapters if (str(c.volume).strip(), c.number) in keys]
+        redo = self.submit(job.title, chapters, job.outputs, job.task)
+        redo.redo = True
+        return redo
 
     def recent(self):
         return sorted(self.jobs.values(), key=lambda j: j.id, reverse=True)

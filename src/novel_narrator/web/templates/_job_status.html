@@ -26,6 +26,11 @@
         <button type="submit" class="btn ghost small">Tentar de novo os que falharam</button>
       </form>
       {% endif %}
+      {% if job.warned and not job.active %}
+      <form method="post" action="/jobs/{{ job.id }}/redo-warned">
+        <button type="submit" class="btn ghost small">Refazer os com alerta ({{ job.warned | length }})</button>
+      </form>
+      {% endif %}
     </div>
   </div>
   {% if job.status == "stopping" %}
