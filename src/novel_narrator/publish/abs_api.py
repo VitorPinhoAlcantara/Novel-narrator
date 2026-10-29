@@ -5,7 +5,7 @@ import time
 import requests
 
 from novel_narrator.log import log
-from novel_narrator.publish.abs_server import ssh
+from novel_narrator.publish.abs_server import is_remote, ssh
 
 _MOUNTS_COMMAND = (
     "for n in $(docker ps --format '{{.Names}} {{.Image}}' | awk '/audiobookshelf/ {print $1}'); do "
@@ -157,3 +157,19 @@ def libraries_sharing_folder(libraries, target, folder):
                 others.append(lib["name"])
                 break
     return others
+
+
+def library_destination(abs_cfg, name):
+    """Config changes that send the upload to library `name`; ValueError when it can't be resolved."""
+    if not name:
+        return {}
+    chosen = next((lib for lib in list_libraries(abs_cfg) if lib["name"] == name), None)
+    if chosen is None or not chosen["folders"]:
+        raise ValueError(f"Biblioteca sem pasta configurada: {name}")
+    changes = {"library": name}
+    if is_remote(abs_cfg):
+        folder = server_folder(chosen["folders"][0], detect_mounts(abs_cfg))
+        if folder is None:
+            raise ValueError(f"Nao consegui descobrir a pasta de {name} no servidor")
+        changes["remote_dir"] = folder
+    return changes

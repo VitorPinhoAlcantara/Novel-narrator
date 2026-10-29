@@ -62,6 +62,17 @@ Opens the terminal menus. From there you can:
 - **Arquivo local:** pick a `.epub`, `.pdf` or `.docx`, choose the chapters, and publish it as a single audiobook in a library you choose.
 - **Configs ABS:** set up and test the Audiobookshelf connection.
 
+With a subcommand it runs without any prompts (handy for scripts). Chapters that are already done are skipped unless you pass `--overwrite`, and the exit code is 1 when a chapter fails:
+
+```bash
+uv run novel-narrator book "C:\Livros\livro.pdf" --list                  # show chapters (* = suggested)
+uv run novel-narrator book "C:\Livros\livro.pdf" --chapters 2-10 --library Livros
+uv run novel-narrator search "shadow slave"
+uv run novel-narrator novel "shadow slave" --volumes 1 --outputs audio,pdf
+```
+
+`book` uses the suggested chapters and the configured library when `--chapters`/`--library` are left out. `novel` takes a link or a name (first search result) and needs `--chapters` (`1,3,10-15` or `all`) or `--volumes`.
+
 ```bash
 uv run novel-narrator-web
 ```

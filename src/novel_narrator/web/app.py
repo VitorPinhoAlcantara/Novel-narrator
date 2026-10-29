@@ -165,19 +165,10 @@ def create_app(config=None, source=None, jobs=None):
         return RedirectResponse(f"/jobs/{job.id}", status_code=303)
 
     def library_destination(name):
-        if not name:
-            return {}
-        libraries = abs_api.list_libraries(config["abs"])
-        chosen = next((lib for lib in libraries if lib["name"] == name), None)
-        if chosen is None or not chosen["folders"]:
-            raise HTTPException(400, f"Biblioteca sem pasta configurada: {name}")
-        changes = {"library": name}
-        if abs_server.is_remote(config["abs"]):
-            folder = abs_api.server_folder(chosen["folders"][0], abs_api.detect_mounts(config["abs"]))
-            if folder is None:
-                raise HTTPException(400, f"Nao consegui descobrir a pasta de {name} no servidor")
-            changes["remote_dir"] = folder
-        return changes
+        try:
+            return abs_api.library_destination(config["abs"], name)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
 
     @app.get("/jobs", response_class=HTMLResponse)
     def jobs_page(request: Request):
